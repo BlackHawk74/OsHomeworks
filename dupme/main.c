@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define STDIN 0
 #define STDOUT 1
@@ -39,11 +40,13 @@ int main(int argc, char** argv)
 
     while ((read_res = read(STDIN, buffer + len, k - len)) > 0)
     {
+        printf("read_res = %d\n", read_res);
         output_start= 0;
         for (i = len; i < len + read_res; ++i)
         {
             if (buffer[i] == '\n')
             {
+                printf("found newline at %d\n", i);
                if (current_state == IGNORING)
                {
                    output_start = i + 1;
@@ -66,8 +69,9 @@ int main(int argc, char** argv)
                output_start = i + 1;
             }
         }
-        memmove(buffer, buffer + output_start, len + read_res - output_start + 1);
-        len = len + read_res - output_start + 1;
+        printf("current output start %d\n", output_start);
+        memmove(buffer, buffer + output_start, len + read_res - output_start);
+        len = len + read_res - output_start;
         if (len == k)
         {
             current_state = IGNORING;
