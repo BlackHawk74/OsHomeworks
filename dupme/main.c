@@ -42,7 +42,7 @@ int main(int argc, char** argv)
         output_start= 0;
         for (i = len; i < len + read_res; ++i)
         {
-            if (buf[i] == '\n')
+            if (buffer[i] == '\n')
             {
                if (current_state == IGNORING)
                {
@@ -55,7 +55,7 @@ int main(int argc, char** argv)
                     write_start = output_start;
                     while (write_start < output_end)
                     {
-                        write_res = write(STDOUT, buf + output_start, output_end - output_start);
+                        write_res = write(STDOUT, buffer + output_start, output_end - output_start);
                         if (write_res == -1)
                         {
                             return 3;
@@ -66,9 +66,15 @@ int main(int argc, char** argv)
                output_start = i + 1;
             }
         }
-        memmove(buf, buf + output_start, len + read_res - output_start + 1);
+        memmove(buffer, buffer + output_start, len + read_res - output_start + 1);
         len = len + read_res - output_start + 1;
+        if (len == k)
+        {
+            current_state = IGNORING;
+            len = 0;
+        }
     }
+
     return 0;
 }
 
