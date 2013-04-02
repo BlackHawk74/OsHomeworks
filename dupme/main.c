@@ -5,7 +5,7 @@
 #define STDIN 0
 #define STDOUT 1
 
-   
+
 enum state {
     NORMAL, IGNORING
 } current_state;
@@ -38,35 +38,59 @@ int main(int argc, char** argv)
     len = 0;
     current_state = NORMAL;
 
-    while ((read_res = read(STDIN, buffer + len, k - len)) > 0)
+    while (1)
     {
+        read_res = read(STDIN, buffer + len, k - len);
         printf("read_res = %d\n", read_res);
+        if (read_res == 0) {
+            // EOF
+            if (len > 0 && current_state == NORMAL)
+            {
+                buffer[len] = '\n';
+                len++;
+                for (i = 0; i < 2; i++)
+                {
+                    write_start = 0;
+                    while (write_start < len)
+                    {
+                        write_res = write(STDOUT, buffer + write_start, len - write_start);
+                        write_start += write_res;
+                    }
+                }
+            }
+            return 0;
+        }
+        else if (read_res < 0)
+        {
+            // Some read error
+            return 4;
+        }
         output_start= 0;
         for (i = len; i < len + read_res; ++i)
         {
             if (buffer[i] == '\n')
             {
                 printf("found newline at %d\n", i);
-               if (current_state == IGNORING)
-               {
-                   output_start = i + 1;
-                   current_state = NORMAL;
-               }
-               output_end = i + 1;
-               for (j = 0; j < 2; ++j)
-               {
+                if (current_state == IGNORING)
+                {
+                    output_start = i + 1;
+                    current_state = NORMAL;
+                }
+                output_end = i + 1;
+                for (j = 0; j < 2; ++j)
+                {
                     write_start = output_start;
                     while (write_start < output_end)
                     {
-                        write_res = write(STDOUT, buffer + output_start, output_end - output_start);
+                        write_res = write(STDOUT, buffer + write_start, output_end - output_start);
                         if (write_res == -1)
                         {
                             return 3;
                         }
                         write_start += write_res;
                     }
-               }
-               output_start = i + 1;
+                }
+                output_start = i + 1;
             }
         }
         printf("current output start %d\n", output_start);
