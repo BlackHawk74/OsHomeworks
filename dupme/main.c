@@ -20,6 +20,7 @@ int main(int argc, char** argv)
     int i, j;
     int write_start;
     int write_res;
+    int eof_reached;
 
     if (argc < 2)
     {
@@ -37,6 +38,7 @@ int main(int argc, char** argv)
     buffer = (char *) malloc(k + 1);
     len = 0;
     current_state = NORMAL;
+    eof_reached = 0;
 
     while (1)
     {
@@ -47,18 +49,10 @@ int main(int argc, char** argv)
             if (len > 0 && current_state == NORMAL)
             {
                 buffer[len] = '\n';
-                len++;
-                for (i = 0; i < 2; i++)
-                {
-                    write_start = 0;
-                    while (write_start < len)
-                    {
-                        write_res = write(STDOUT, buffer + write_start, len - write_start);
-                        write_start += write_res;
-                    }
-                }
+                read_res = len + 1;
+                len = 0;
             }
-            return 0;
+            eof_reached = 1;
         }
         else if (read_res < 0)
         {
@@ -93,6 +87,10 @@ int main(int argc, char** argv)
                 output_start = i + 1;
             }
         }
+        if (eof_reached)
+        {
+            break;
+        }
         printf("current output start %d\n", output_start);
         memmove(buffer, buffer + output_start, len + read_res - output_start);
         len = len + read_res - output_start;
@@ -102,7 +100,7 @@ int main(int argc, char** argv)
             len = 0;
         }
     }
-
+    free(buffer);
     return 0;
 }
 
