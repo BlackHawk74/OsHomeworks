@@ -35,7 +35,7 @@ int main(int argc, char** argv)
     }
 
     k++;
-    buffer = (char *) malloc(k + 1);
+    buffer = (char *) malloc(k);
     len = 0;
     current_state = NORMAL;
     eof_reached = 0;
@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     while (1)
     {
         read_res = read(STDIN, buffer + len, k - len);
-//        printf("read_res = %d\n", read_res);
+        //printf("read_res = %d\n", read_res);
         if (read_res == 0) {
             // EOF
             if (len > 0 && current_state == NORMAL)
@@ -64,7 +64,7 @@ int main(int argc, char** argv)
         {
             if (buffer[i] == '\n')
             {
-//                printf("found newline at %d\n", i);
+                //printf("found newline at %d\n", i);
                 if (current_state == IGNORING)
                 {
                     output_start = i + 1;
@@ -91,7 +91,7 @@ int main(int argc, char** argv)
         {
             break;
         }
-//        printf("current output start %d\n", output_start);
+        //printf("current output start %d\n", output_start);
         memmove(buffer, buffer + output_start, len + read_res - output_start);
         len = len + read_res - output_start;
         if (len == k)
