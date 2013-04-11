@@ -1,9 +1,12 @@
 #!/bin/bash
 
-for f 
+for f
 do
-    if [ "$f" != "." -a "$FILE" != ".." ]
+    if [ -e "$f" -a "$f" != "." -a "$FILE" != ".." ]
     then
-        printf "%s\n" "$f"
+       echo `basename "$f"`
+       read newName
+       dirName=`dirname "$f"`
+       mv "$f" "${dirName}/${newName}"
     fi
 done
