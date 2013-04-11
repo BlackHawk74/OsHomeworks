@@ -2,13 +2,8 @@
 
 function checkBroken {
     fileName="$1"
-    lnk=$(readlink "$fileName")
-
-    if [[ ${lnk:0:1} != "/" && ${fileName%/*} != $fileName ]]; then
-        lnk="${fileName%/*}/$lnk"
-    fi
    
-    if [[ ! -e $lnk ]]; then
+    if [[ ! -e $fileName ]]; then
         if [[ ${fileName:0:1} != "/" ]]; then
            fileName="$PWD/$fileName"
         fi
