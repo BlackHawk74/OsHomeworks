@@ -1,9 +1,9 @@
 #!/bin/bash
 
-for FILE in "$1"
-    do
-    if [ "$FILE" != "." -a "$FILE" != ".." ]
-        then
-        printf "%s\n" "$FILE"
+for f 
+do
+    if [ "$f" != "." -a "$FILE" != ".." ]
+    then
+        printf "%s\n" "$f"
     fi
 done
