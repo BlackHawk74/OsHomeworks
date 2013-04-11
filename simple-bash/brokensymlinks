@@ -1,14 +1,18 @@
 #!/bin/bash -e
 
 function checkBroken {
-    lnk=$(readlink "$1")
+    fileName="$1"
+    lnk=$(readlink "$fileName")
 
-    if [ ${lnk:0:1} != "/" ]; then
-        lnk="${1%/*}/$lnk"
+    if [[ ${lnk:0:1} != "/" && ${fileName%/*} != $fileName ]]; then
+        lnk="${fileName%/*}/$lnk"
     fi
-    
+   
     if [[ ! -e $lnk ]]; then
-        echo "$2$1"
+        if [[ ${fileName:0:1} != "/" ]]; then
+           fileName="$PWD/$fileName"
+        fi
+        echo "$fileName"
     fi
 }
 
@@ -16,7 +20,7 @@ function recursiveVisit {
     pushd "$1" > /dev/null
     for fileName in *; do
         if [[ -h $fileName ]]; then
-            checkBroken "$fileName" "$1/"
+            checkBroken "$fileName"
         else
             if [[ -d $fileName ]]; then
                 recursiveVisit "$fileName"
@@ -27,11 +31,11 @@ function recursiveVisit {
 }
 
 for f; do
-    if [[ -d $f ]]; then
-        recursiveVisit "$f"
+    if [[ -h $f ]]; then
+        checkBroken "$f"
     else
-        if [[ -h $f ]]; then
-            checkBroken "$f"
+        if [[ -d $f ]]; then
+            recursiveVisit "$f"
         fi
     fi
 done
