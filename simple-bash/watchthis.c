@@ -4,6 +4,19 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <signal.h>
+#include <fcntl.h>
+
+const char* FIFO_OLD = "/tmp/watchthis_fifo0";
+const char* FIFO_NEW = "/tmp/watchthis_fifo1";
+
+void exit_function()
+{
+    remove(FIFO_OLD);
+    remove(FIFO_NEW);
+    _exit(0);
+}
+
 
 int main(int argc, char** argv)
 {
@@ -19,6 +32,15 @@ int main(int argc, char** argv)
         puts("Interval must be greater than zero");
         return 2;
     }
+
+    int fifo0 = mkfifo(FIFO_OLD, S_IRUSR | S_IWUSR);
+    int fifo1 = mkfifo(FIFO_NEW, S_IRUSR | S_IWUSR);
+    if (fifo0 || fifo1)
+    {
+        return 3;
+    }
+    signal(SIGINT, exit_function); 
+    signal(SIGTERM, exit_function);
 
     int pipefd[2];
 
@@ -50,6 +72,7 @@ int main(int argc, char** argv)
                     old_buf = (char*) realloc((void*) buf, buf_size);
                 }
             }
+            close(pipefd[0]);
 
             int written;
             for (written = 0; written < used; )
@@ -58,33 +81,36 @@ int main(int argc, char** argv)
             }
             if (old_used > 0)
             {
-                int fifo0 = mkfifo("/tmp/watchthis_fifo0", S_IRUSR | S_IWUSR);
-                int fifo1 = mkfifo("/tmp/watchthis_fifo1", S_IRUSR | S_IWUSR);
-                if (!fifo0 || !fifo1)
-                {
-                    return 3;
-                }
 
                 if (fork())
                 {
-                    int fd0 = open("/tmp/watchthis_fifo0", O_WRONLY);
-                    int fd1 = open("/tmp/watchthis_fifo1", O_WRONLY);
-                    int written;
+                    int fd0 = open(FIFO_OLD, O_WRONLY);
+                    int fd1 = open(FIFO_NEW, O_WRONLY);
+
                     for (written = 0; written < old_used;)
                     {
-                        written += write(fd0, old_buf, old_used - written);
+                        written += write(fd0, old_buf + written, old_used - written);
                     }
                     for (written = 0; written < used;)
                     {
-                        written += write(fd1, buf, used - written);
+                        written += write(fd1, buf + written, used - written);
                     }
+
+                    close(fd0);
+                    close(fd1);
+                    
+                    wait(NULL);
+                    
                 } else {
-                    execlp("diff", "diff", "-u", "/tmp/watchthis_fifo0", "/tmp/watchthis_fifo1");
+                    execlp("diff", "diff", "-u", FIFO_OLD, FIFO_NEW, NULL);
                 }
             }
             
+            char * t = old_buf;
+            old_buf = buf;
+            buf = t;
+            old_used = used;
 
-            close(pipefd[0]);
             sleep(interval);
 
         } else {
