@@ -1,7 +1,15 @@
 #!/bin/bash -e
 
 function checkBroken {
-    echo "checkBroken: $2$1"
+    lnk=$(readlink "$1")
+
+    if [ ${lnk:0:1} != "/" ]; then
+        lnk="${1%/*}/$lnk"
+    fi
+    
+    if [[ ! -e $lnk ]]; then
+        echo "$2$1"
+    fi
 }
 
 function recursiveVisit {
