@@ -1,11 +1,11 @@
-#!/bin/bash
+#!/bin/bash -e
 
 function checkBroken {
-    echo "$1"
+    echo "checkBroken: $1"
 }
 
 function recursiveVisit {
-    cd "$1"
+    pushd "$1" > /dev/null
     for fileName in *; do
         if [[ -h $fileName ]]; then
             checkBroken "$fileName"
@@ -15,7 +15,7 @@ function recursiveVisit {
             fi
         fi
     done
-    cd ..
+    popd > /dev/null
 }
 
 for f; do
