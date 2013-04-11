@@ -1,0 +1,29 @@
+#!/bin/bash
+
+function checkBroken {
+    echo "$1"
+}
+
+function recursiveVisit {
+    cd "$1"
+    for fileName in *; do
+        if [[ -h $fileName ]]; then
+            checkBroken "$fileName"
+        else
+            if [[ -d $fileName ]]; then
+                recursiveVisit "$fileName"
+            fi
+        fi
+    done
+    cd ..
+}
+
+for f; do
+    if [[ -d $f ]]; then
+        recursiveVisit "$f"
+    else
+        if [[ -h $f ]]; then
+            checkBroken "$f"
+        fi
+    fi
+done
