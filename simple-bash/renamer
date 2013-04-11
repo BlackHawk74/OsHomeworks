@@ -1,9 +1,7 @@
 #!/bin/bash
 
-for f
-do
-    if [ -f "$f" ]
-    then
+for f; do
+    if [[ -f $f ]]; then
        echo `basename "$f"`
        read newName
        dirName=`dirname "$f"`

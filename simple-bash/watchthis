@@ -3,12 +3,10 @@
 SLEEP_INTERVAL=$1
 oldOutput=""
 
-while [ 1 ]
-do
+while [ 1 ]; do
     newOutput=$(${*:2})
     echo "$newOutput"
-    if [ -n "$oldOutput" ]
-    then
+    if [[ -n $oldOutput ]]; then
         diff -u <(echo "$oldOutput") <(echo "$newOutput")
     fi
     oldOutput="$newOutput"
