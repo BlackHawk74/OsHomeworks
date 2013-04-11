@@ -10,10 +10,15 @@
 const char* FIFO_OLD = "/tmp/watchthis_fifo0";
 const char* FIFO_NEW = "/tmp/watchthis_fifo1";
 
-void exit_function()
+void remove_fifos()
 {
     remove(FIFO_OLD);
     remove(FIFO_NEW);
+}
+
+void exit_function()
+{
+    remove_fifos();
     _exit(0);
 }
 
@@ -37,6 +42,7 @@ int main(int argc, char** argv)
     int fifo1 = mkfifo(FIFO_NEW, S_IRUSR | S_IWUSR);
     if (fifo0 || fifo1)
     {
+        remove_fifos();
         return 3;
     }
     signal(SIGINT, exit_function); 
@@ -69,7 +75,7 @@ int main(int argc, char** argv)
 //                    write(1, "realloc\n", 8);
                     buf_size *= 2;
                     buf = (char*) realloc((void*) buf, buf_size);
-                    old_buf = (char*) realloc((void*) buf, buf_size);
+                    old_buf = (char*) realloc((void*) old_buf, buf_size);
                 }
             }
             close(pipefd[0]);
