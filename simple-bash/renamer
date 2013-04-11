@@ -2,7 +2,7 @@
 
 for f
 do
-    if [ -e "$f" -a "$f" != "." -a "$FILE" != ".." ]
+    if [ -f "$f" ]
     then
        echo `basename "$f"`
        read newName
