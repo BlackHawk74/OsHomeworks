@@ -52,7 +52,8 @@ int main(int argc, char** argv)
             buf_size = atoi(optarg);
             if (buf_size <= 0)
             {
-                return 2;
+                write_all(STDERR_FILENO, "Buffer size should be positive number\n", 39);
+                _exit(2);
             }
             opt_count++;
             break;
@@ -68,8 +69,8 @@ int main(int argc, char** argv)
     
     if (opt_count >= argc)
     {
-        puts("No command provided");
-        return 1;
+        write_all(STDERR_FILENO, "No command provided\n", 21);
+        _exit(1);
     }
 
     // One more char for delimiter
@@ -153,7 +154,7 @@ int main(int argc, char** argv)
                 if (i == buf_size - 1 && buf_last_element == 0)
                 {
                     // Buffer overflow
-                    return 5;
+                    _exit(5);
                 }
             }
         }
@@ -172,6 +173,6 @@ int main(int argc, char** argv)
     free(cmd_argv);
     free(buf);
 
-    return 0;
+    _exit(0);
 }
 
