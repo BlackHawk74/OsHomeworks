@@ -64,18 +64,15 @@ int main(int argc, char** argv)
     buf_size++;
     char * buf = malloc(sizeof(char) * buf_size);
 
-    size_t buf_used = 0;
-    int read_count;
 
     char** cmd_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
-    int j, cmd_argc = 0;
-    for (j = opt_count; j < argc; j++)
-    {
-        cmd_argv[cmd_argc++] = argv[j];
-    }
+    int cmd_argc = argc - opt_count;
+    memcpy(cmd_argv, &argv[opt_count], sizeof(char*) * cmd_argc);
     cmd_argv[cmd_argc + 1] = NULL;
 
     int eof_reached = 0;
+    size_t buf_used = 0;
+    int read_count;
 
     while (1)
     {
@@ -135,6 +132,7 @@ int main(int argc, char** argv)
         }
     }
 
+    free(cmd_argv);
     free(buf);
     return 0;
 }
