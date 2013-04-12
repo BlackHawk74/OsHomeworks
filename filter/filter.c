@@ -62,15 +62,14 @@ int main(int argc, char** argv)
     size_t buf_used = 0;
     int read_count;
 
-    char ** prog_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
+    char ** cmd_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
 //    char * prog_last;
-    int j, prog_c = 0;
+    int j, cmd_argc = 0;
     for (j = opt_count; j < argc; j++)
     {
-        prog_argv[prog_c++] = argv[j];
+        cmd_argv[cmd_argc++] = argv[j];
     }
-    prog_argv[prog_c] = buf;
-    prog_argv[prog_c + 1] = NULL;
+    cmd_argv[cmd_argc + 1] = NULL;
 
 
     int last_input = 0;
@@ -89,11 +88,13 @@ int main(int argc, char** argv)
         }
         size_t i;
         size_t buf_max = buf_used + read_count;
+        size_t buf_last_element = 0;
         for (i = buf_used; i < buf_max; i++)
         {
             if (buf[i] == delim_c)
             {
                 buf[i] = 0;
+                cmd_argv[cmd_argc] = buf + buf_last_element;
                 pid_t pid = fork();
                 if (pid)
                 {
@@ -102,20 +103,18 @@ int main(int argc, char** argv)
                     buf[i] = delim_c;
                     if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
                     {
-                        write_all(STDOUT_FILENO, buf, i + 1);
+                        write_all(STDOUT_FILENO, buf + buf_last_element, i + 1 - buf_last_element);
                     }
-                    memmove(buf, buf + i + 1, buf_size - i - 1);
-                    buf_max -= i + 1;
-                    i = 0;
-                } else 
+                    buf_last_element = i + 1;
+                } else
                 {
                     int fd = open("/dev/null", O_WRONLY);
                     dup2(fd, STDOUT_FILENO);
                     close(fd);
-                    execvp(prog_argv[0], prog_argv);
+                    execvp(cmd_argv[0], cmd_argv);
                     _exit(6);
                 }
-            } else 
+            } else
             {
                 if (i == buf_size - 1)
                 {
@@ -123,7 +122,9 @@ int main(int argc, char** argv)
                 }
             }
         }
-        buf_used = buf_max;
+
+        memmove(buf, buf + buf_last_element, buf_size - buf_last_element);
+        buf_used = buf_max - buf_last_element;
         if (last_input)
         {
             break;
