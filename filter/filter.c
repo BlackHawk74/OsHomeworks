@@ -25,11 +25,12 @@ int main(int argc, char** argv)
         puts("No command provided");
         return 1;
     }
+
     int opt_count = 1;
-    char delim_c = '\n';
+    char delim = '\n';
     while (1)
     {
-        int next_opt = getopt(argc, argv, "nzb:");
+        int next_opt = getopt(argc, argv, "+nzb:");
         if (next_opt == -1)
         {
             break;
@@ -37,10 +38,10 @@ int main(int argc, char** argv)
         switch (next_opt)
         {
         case 'n':
-            delim_c = '\n';
+            delim = '\n';
             break;
         case 'z':
-            delim_c = 0;
+            delim = 0;
             break;
         case 'b':
             buf_size = atoi(optarg);
@@ -54,7 +55,9 @@ int main(int argc, char** argv)
         opt_count++;
     }
 
-    opt_count++;
+    if (strcmp(argv[opt_count], "--") == 0) {
+        opt_count++;
+    }
 
     buf_size++;
     buf = malloc(buf_size);
@@ -63,7 +66,6 @@ int main(int argc, char** argv)
     int read_count;
 
     char ** cmd_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
-//    char * prog_last;
     int j, cmd_argc = 0;
     for (j = opt_count; j < argc; j++)
     {
@@ -83,7 +85,7 @@ int main(int argc, char** argv)
             {
                 break;
             }
-            buf[buf_used] = delim_c;
+            buf[buf_used] = delim;
             read_count++;
         }
         size_t i;
@@ -91,7 +93,7 @@ int main(int argc, char** argv)
         size_t buf_last_element = 0;
         for (i = buf_used; i < buf_max; i++)
         {
-            if (buf[i] == delim_c)
+            if (buf[i] == delim)
             {
                 buf[i] = 0;
                 cmd_argv[cmd_argc] = buf + buf_last_element;
@@ -100,7 +102,7 @@ int main(int argc, char** argv)
                 {
                     int status;
                     waitpid(pid, &status, 0);
-                    buf[i] = delim_c;
+                    buf[i] = delim;
                     if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
                     {
                         write_all(STDOUT_FILENO, buf + buf_last_element, i + 1 - buf_last_element);
