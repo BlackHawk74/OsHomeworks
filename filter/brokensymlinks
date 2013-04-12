@@ -1,3 +1,11 @@
 #!/bin/bash -e
 
-find "$1" -print0 | ./filter -z -- ./testsymlink | xargs -0 echo
+AUXILIARY_SCRIPT=/tmp/testsymlink
+
+echo -e '#!/bin/bash\nif [[ -h $1 && ! -e $1 ]]; then exit 0; else exit 1; fi' > "$AUXILIARY_SCRIPT"
+
+chmod +x "$AUXILIARY_SCRIPT"
+
+find "$1" -print0 | ./filter -z -- "$AUXILIARY_SCRIPT" | xargs -0 echo
+
+rm -f "$AUXILIARY_SCRIPT"
