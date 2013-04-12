@@ -10,9 +10,16 @@
 void write_all(int fd, char * buf, size_t count)
 {
     int written;
+    
+    // write() has no guarantee to write everything
     for (written = 0; written < count;)
     {
-        written += write(fd, buf + written, count - written);
+        int t = write(fd, buf + written, count - written);
+        if (t == -1) // Write failed
+        {
+            _exit(4);
+        }
+        written += t;
     }
 }
 
@@ -82,6 +89,11 @@ int main(int argc, char** argv)
     while (1)
     {
         read_count = read(STDIN_FILENO, buf + buf_used, buf_size - buf_used);
+        
+        if (read_count < 0) // IO error
+        {
+            _exit(4);
+        }
 
         if (!read_count) // EOF found
         {
@@ -110,6 +122,7 @@ int main(int argc, char** argv)
                 cmd_argv[cmd_argc] = buf + buf_last_element;
 
                 pid_t pid = fork();
+
                 if (pid) // parent
                 {
                     int status;
@@ -117,6 +130,7 @@ int main(int argc, char** argv)
                     // Waiting for child to exit
                     waitpid(pid, &status, 0);
                     buf[i] = delim;
+
                     if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
                     {
                         // Command executed with exit code 0
@@ -157,6 +171,7 @@ int main(int argc, char** argv)
     // Releasing allocated memory
     free(cmd_argv);
     free(buf);
+
     return 0;
 }
 
