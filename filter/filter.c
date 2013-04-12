@@ -19,15 +19,9 @@ void write_all(int fd, char * buf, size_t count)
 int main(int argc, char** argv)
 {
     int buf_size = 4096;
-    char * buf;
-    if (argc < 2)
-    {
-        puts("No command provided");
-        return 1;
-    }
-
-    int opt_count = 1;
     char delim = '\n';
+    int opt_count = 1;
+    
     while (1)
     {
         int next_opt = getopt(argc, argv, "+nzb:");
@@ -35,6 +29,7 @@ int main(int argc, char** argv)
         {
             break;
         }
+
         switch (next_opt)
         {
         case 'n':
@@ -55,17 +50,24 @@ int main(int argc, char** argv)
         opt_count++;
     }
 
-    if (strcmp(argv[opt_count], "--") == 0) {
+    if (argc > opt_count && strcmp(argv[opt_count], "--") == 0) {
         opt_count++;
     }
+    
+    if (opt_count >= argc)
+    {
+        puts("No command provided");
+        return 1;
+    }
+
 
     buf_size++;
-    buf = malloc(buf_size);
+    char * buf = malloc(sizeof(char) * buf_size);
 
     size_t buf_used = 0;
     int read_count;
 
-    char ** cmd_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
+    char** cmd_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
     int j, cmd_argc = 0;
     for (j = opt_count; j < argc; j++)
     {
@@ -73,14 +75,13 @@ int main(int argc, char** argv)
     }
     cmd_argv[cmd_argc + 1] = NULL;
 
-
-    int last_input = 0;
+    int eof_reached = 0;
 
     while (1)
     {
         read_count = read(STDIN_FILENO, buf + buf_used, buf_size - buf_used);
         if (!read_count) {
-            last_input = 1;
+            eof_reached = 1;
             if (buf_used == 0)
             {
                 break;
@@ -91,6 +92,7 @@ int main(int argc, char** argv)
         size_t i;
         size_t buf_max = buf_used + read_count;
         size_t buf_last_element = 0;
+
         for (i = buf_used; i < buf_max; i++)
         {
             if (buf[i] == delim)
@@ -118,7 +120,7 @@ int main(int argc, char** argv)
                 }
             } else
             {
-                if (i == buf_size - 1)
+                if (buf_last_element == 0 && i == buf_size - 1)
                 {
                     return 5;
                 }
@@ -127,7 +129,7 @@ int main(int argc, char** argv)
 
         memmove(buf, buf + buf_last_element, buf_size - buf_last_element);
         buf_used = buf_max - buf_last_element;
-        if (last_input)
+        if (eof_reached)
         {
             break;
         }
