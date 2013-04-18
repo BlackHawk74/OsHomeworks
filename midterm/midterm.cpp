@@ -434,5 +434,14 @@ int main(int argc, char ** argv)
 
         remove(tmp_old.c_str());
     }
+
+    for (auto command : commands)
+    {
+        for (int i = 0; command[i] != NULL; i++)
+        {
+            free(command[i]);
+        }
+        free(command);
+    }
 }
 
