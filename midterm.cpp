@@ -21,6 +21,7 @@ public:
     buf_used(0),
     buf_start(0),
     eof(false),
+    _has_next(true),
     buffer((char*)malloc((BUFFER_SIZE + 1) * sizeof(char)))
     {}
 
@@ -28,9 +29,9 @@ public:
     std::string next_argument()
     {
         std::string result = "";
-        int read_result = 0;
         state_t state = state_t::NORMAL;
         
+//        std::cout << "next_argument — eof: " << eof << " buf_start: " << buf_start << " buf_used: " << buf_used << "\n";
         while(true)
         {
             for (int i = buf_start; i < buf_used; i++)
@@ -40,10 +41,11 @@ public:
                 case state_t::NORMAL:
                     if (buffer[i] == DELIMITER)
                     {
+//                        std::cout << "Delimiter " << i << "\n";
                         result.append(buffer + buf_start, buffer + i);
                         buf_start = i + 1;
                         return result;
-                    } else if (buffer[i] == '\')
+                    } else if (buffer[i] == '\\')
                     {
                         result.append(buffer + buf_start, buffer + i);
                         buf_start = i + 1;
@@ -51,7 +53,7 @@ public:
                     }
                     break;
                 case state_t::ESCAPED:
-                    if (buffer[i] != '\' && buffer[i] != DELIMITER)
+                    if (buffer[i] != '\\' && buffer[i] != DELIMITER)
                     {
                         std::cerr << "Error in input file" << std::endl;
                         _exit(4);
@@ -64,6 +66,7 @@ public:
 
             if (eof)
             {
+                _has_next = false;
                 break;
             }
 
@@ -76,24 +79,33 @@ public:
             }
 
         }
+
         return result;
 
+    }
+
+    bool has_next()
+    {
+        return _has_next;
     }
 
     ~reader_t()
     {
         free(buffer);
+        close(fd);
     }
 
 private:
     int fd;
-    int buf_start;
     int buf_used;
+    int buf_start;
     bool eof;
+    bool _has_next;
     char * buffer;
 
     int do_read()
     {
+//        std::cout << "do_read()\n";
         if (eof) return 0;
         if (buf_used == BUFFER_SIZE)
         {
@@ -115,7 +127,7 @@ private:
 
         buf_used += read_result;
         return read_result;
-
+    }
 };
 
 
@@ -138,7 +150,10 @@ int main(int argc, char ** argv)
     std::vector<std::string> command;
     reader_t reader(fd);
 
-    
+    while (reader.has_next())
+    {
+        std::cout << reader.next_argument() << "\n--------\n";
+    }
 
 }
 
