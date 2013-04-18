@@ -10,7 +10,7 @@
 
 void write_all(int fd, char * buf, size_t count)
 {
-    int written;
+    size_t written;
 
     for (written = 0; written < count;)
     {
@@ -182,76 +182,65 @@ private:
 const char * TMP_FILE = "/tmp/midterm";
 const char * TMP_OLD = "/tmp/midterm_old";
 
-void run_commands(std::vector<char **> const& commands)
+
+void run_one(char** args, int fd_in, int fd_out)
 {
-
-    int prev_pipe = -1;
-    int tmp_fd;
-
-    for (int i = 0; i < commands.size(); i++)
+    std::cout << "Running " << args[0] << "\n";
+    std::cout << "IN: " << fd_in << " OUT: " << fd_out << "\n";
+    if (fd_in != STDIN_FILENO)
     {
-        int pipefd[2];
-        pipe(pipefd);
-
-        pid_t pid = fork();
-
-        if (pid)
-        {
-            close(pipefd[1]);
-
-            if (prev_pipe != -1)
-            {
-                close(prev_pipe);
-            }
-
-
-            if (i == commands.size() - 1)
-            {
-                tmp_fd = open(TMP_FILE, O_WRONLY | O_CREAT, 00644);
-                copy_fd(pipefd[0], tmp_fd);
-                close(tmp_fd);
-                int status;
-                waitpid(pid, &status, 0);
-
-                if (WIFEXITED(status) && WEXITSTATUS(status) == 0)
-                {
-                    close(pipefd[0]);
-                }
-                else
-                {
-                    std::cerr << "Command did not exit correctly\n";
-                    _exit(11);
-                }
-            } else
-            {
-                prev_pipe = pipefd[0];
-            }
-        } else
-        {
-            std::cout << "executing: " << commands[i][0] << "\n";
-            std::cout << "prev_pipe " << prev_pipe << "pipefd[1] " << pipefd[1] << "\n";
-            dup2(pipefd[1], STDOUT_FILENO);
-            close(pipefd[0]);
-            close(pipefd[1]);
-
-            if (prev_pipe != -1)
-            {
-                dup2(prev_pipe, STDIN_FILENO);
-                close(prev_pipe);
-            }
-            else
-            {
-                int in_fd = open(TMP_OLD, O_RDONLY);
-                dup2(in_fd, STDIN_FILENO);
-                close(in_fd);
-            }
-
-            execvp(commands[i][0], commands[i]);
-            _exit(10);
-        }
+        dup2(fd_in, STDIN_FILENO);
+        close(fd_in);
     }
+    if (fd_out != STDOUT_FILENO)
+    {
+        dup2(fd_out, STDOUT_FILENO);
+        close(fd_out);
+    }
+    execvp(args[0], args);
+    _exit(10);
 }
 
+void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_out)
+{
+    int pipefd[2];
+    
+    int pipe_in = fd_in;
+    int pipe_out = fd_out;
+
+    std::cout << "Running command " << pos << "\n";
+
+    if (pos != commands.size() - 1)
+    {
+        pipe(pipefd);
+        pipe_in = pipefd[0];
+        pipe_out = pipefd[1];
+    }
+
+    pid_t pid = fork();
+
+    if (pid)
+    {
+        if (pos != commands.size() - 1)
+        {
+            close(pipe_out);
+            run_all(commands, pos + 1, pipe_in, fd_out);
+            close(pipe_in);
+        } else
+        {
+            int status;
+            waitpid(pid, &status, 0);
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+            {
+                std::cerr << "Command with number " << pos << " finished with code " << WEXITSTATUS(status) << "\n";
+                _exit(11);
+            }
+        }
+    } else 
+    {
+        run_one(commands[pos], fd_in, pipe_out);    
+    }
+}
 
 
 void init()
@@ -308,7 +297,7 @@ int main(int argc, char ** argv)
             cmd[current_command.size()] = NULL;
 
 
-            for (int i = 0; i < current_command.size(); i++)
+            for (size_t i = 0; i < current_command.size(); i++)
             {
                 cmd[i] = (char *) malloc((current_command[i].size() + 1) * sizeof(char));
                 memcpy((void *) cmd[i], (const void *) current_command[i].c_str(), sizeof(char) * current_command[i].size());
@@ -327,7 +316,7 @@ int main(int argc, char ** argv)
         }
     }
 
-    init();
+    //init();
 
     for (auto s: commands)
     {
@@ -340,6 +329,6 @@ int main(int argc, char ** argv)
 
     }
 
-    run_commands(commands);
+    run_all(commands, 0, STDIN_FILENO, STDOUT_FILENO);
 }
 
