@@ -32,7 +32,17 @@ public:
         {
             read_result = read(fd, buffer + buf_used, BUFFER_SIZE - buf_used);
 
+            if (read_result < 0)
+            {
+                std::cerr << "IO error" << std::endl;
+                _exit(3);
+            }
             int end = buf_used + read_result;
+
+            for (int i = buf_used; i < end; ++i)
+            {
+
+            }
         }
 
         return result;
