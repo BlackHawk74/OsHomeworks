@@ -1,4 +1,6 @@
 #include <unistd.h>
+#include <algorithm>
+#include <string>
 #include <cstring>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -7,6 +9,8 @@
 #include <iostream>
 #include <cstdlib>
 #include <vector>
+
+const std::string TMP_BASE = "/tmp/midterm_";
 
 void write_all(int fd, char * buf, size_t count)
 {
@@ -19,7 +23,7 @@ void write_all(int fd, char * buf, size_t count)
         if (t == -1) 
         {
             std::cerr << "IO error\n";
-            _exit(4);
+            _exit(1);
         }
 
         written += t;
@@ -39,7 +43,7 @@ void copy_fd(int from, int to) {
     if (read_result == -1)
     {
         std::cerr << "IO error\n";
-        _exit(15);
+        _exit(2);
     }
 
     free(buf);
@@ -89,7 +93,7 @@ bool compare_files(int old_fd, int new_fd)
             if (read_result == -1)
             {
                 std::cerr << "IO error\n";
-                _exit(6);
+                _exit(3);
             }
             old_eof = read_result == 0;
             old_used += read_result;
@@ -101,7 +105,7 @@ bool compare_files(int old_fd, int new_fd)
             if (read_result == -1)
             {
                 std::cerr << "IO error\n";
-                _exit(6);
+                _exit(4);
             }
             new_eof = read_result == 0;
             new_used += read_result;
@@ -120,6 +124,22 @@ bool compare_files(int old_fd, int new_fd)
     free(old_buf);
     free(new_buf);
     return equal;
+}
+
+bool compare_files(std::string const& a, std::string const& b)
+{
+    int fd1 = open(a.c_str(), O_RDONLY);
+    int fd2 = open(b.c_str(), O_RDONLY);
+    if (fd1 == -1 || fd2 == -1)
+    {
+        std::cerr << "IO error\n";
+        _exit(5);
+    }
+
+    bool result = compare_files(fd1, fd2);
+    close(fd1);
+    close(fd2);
+    return result;
 }
 
 enum class state_t
@@ -173,7 +193,7 @@ public:
                     if (buffer[i] != '\\' && buffer[i] != DELIMITER)
                     {
                         std::cerr << "Error in input file" << std::endl;
-                        _exit(4);
+                        _exit(6);
                     }
 
                     state = state_t::NORMAL;
@@ -238,7 +258,7 @@ private:
         if (read_result < 0)
         {
             std::cerr << "IO error" << std::endl;
-            _exit(3);
+            _exit(7);
         }
 
         if (read_result == 0)
@@ -252,10 +272,6 @@ private:
         return read_result;
     }
 };
-
-const char * TMP_FILE = "/tmp/midterm";
-const char * TMP_OLD = "/tmp/midterm_old";
-
 
 void run_one(char** args, int fd_in, int fd_out)
 {
@@ -272,7 +288,7 @@ void run_one(char** args, int fd_in, int fd_out)
         close(fd_out);
     }
     execvp(args[0], args);
-    _exit(10);
+    _exit(8);
 }
 
 void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_out)
@@ -307,7 +323,7 @@ void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_
             if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
             {
                 std::cerr << "Command with number " << pos << " finished with code " << WEXITSTATUS(status) << "\n";
-                _exit(11);
+                _exit(9);
             }
         }
     } else 
@@ -377,5 +393,42 @@ int main(int argc, char ** argv)
 
     }
 
+    for (int i = 0;; i++)
+    {
+        int in_fd, out_fd;
+        std::string tmp_file = TMP_BASE + std::to_string(i);
+        std::string tmp_old = i == 0 ? "" : TMP_BASE + std::to_string(i - 1);
+        out_fd = open(tmp_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 00644);
+        if (out_fd == -1)
+        {
+            std::cerr << "IO error\n";
+            _exit(10);
+        }
+
+        in_fd = i == 0 ? STDIN_FILENO : open(tmp_old.c_str(), O_RDONLY);
+        if (in_fd == -1)
+        {
+            std::cerr << "IO error\n";
+            _exit(11);
+        }
+
+        run_all(commands, 0, in_fd, out_fd);
+        close(out_fd);
+        if (i != 0)
+        {
+            close(in_fd);
+        }
+
+        if (i != 0 && compare_files(tmp_old, tmp_file))
+        {
+            int out = open(tmp_file.c_str(), O_RDONLY);
+            copy_fd(out, STDOUT_FILENO); 
+            close(out);
+            remove(tmp_file.c_str());
+            remove(tmp_old.c_str());
+            break;
+        }
+        remove(tmp_old.c_str());
+    }
 }
 
