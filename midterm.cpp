@@ -11,6 +11,34 @@
 #include <vector>
 
 const std::string TMP_BASE = "/tmp/midterm_";
+const int BUFFER_SIZE = 1024;
+const char DELIMITER = ' ';
+
+int safe_read(int fd, char * buffer, size_t count)
+{
+    int result = read(fd, buffer, count);
+
+    if (result == -1)
+    {
+        std::cerr << "IO error\n";
+        _exit(21);
+    }
+
+    return result;
+}
+
+int safe_write(int fd, char * buffer, size_t count)
+{
+    int result = write(fd, buffer, count);
+
+    if (result == -1)
+    {
+        std::cerr << "IO error\n";
+        _exit(21);
+    }
+
+    return result;
+}
 
 void write_all(int fd, char * buf, size_t count)
 {
@@ -18,45 +46,55 @@ void write_all(int fd, char * buf, size_t count)
 
     for (written = 0; written < count;)
     {
-        int t = write(fd, buf + written, count - written);
-
-        if (t == -1) 
-        {
-            std::cerr << "IO error\n";
-            _exit(1);
-        }
-
-        written += t;
+        written += safe_write(fd, buf + written, count - written);
     }
 }
 
-void copy_fd(int from, int to) {
-    const int bs = 1024;
+void copy_fd(int from, int to)
+{
+    const int bs = BUFFER_SIZE;
     char * buf = (char *) malloc(bs * sizeof(char));
     int read_result = 0;
 
-    while((read_result = read(from, buf, bs)) > 0)
+    while((read_result = safe_read(from, buf, bs)) > 0)
     {
         write_all(to, buf, read_result);
-    }
-
-    if (read_result == -1)
-    {
-        std::cerr << "IO error\n";
-        _exit(2);
     }
 
     free(buf);
 }
 
+int safe_open(std::string const& path, int flags)
+{
+    int fd = open(path.c_str(), flags);
 
-const int BUFFER_SIZE = 1024;
-const char DELIMITER = ' ';
+    if (fd == -1)
+    {
+        std::cerr << "IO error\n";
+        _exit(20);
+    }
+
+    return fd;
+}
+
+int safe_open(std::string const& path, int flags, mode_t mode)
+{
+    int fd = open(path.c_str(), flags, mode);
+
+    if (fd == -1)
+    {
+        std::cerr << "IO error\n";
+        _exit(20);
+    }
+
+    return fd;
+}
+
 
 bool compare_files(int old_fd, int new_fd)
 {
-    char *old_buf = (char*) malloc(BUFFER_SIZE * sizeof(char));
-    char *new_buf = (char*) malloc(BUFFER_SIZE * sizeof(char));
+    char * old_buf = (char *) malloc(BUFFER_SIZE * sizeof(char));
+    char * new_buf = (char *) malloc(BUFFER_SIZE * sizeof(char));
 
     int old_used = 0, new_used = 0;
     int pos = 0;
@@ -75,38 +113,29 @@ bool compare_files(int old_fd, int new_fd)
                 break;
             }
         }
+
         if (!equal)
         {
             break;
         }
-            
+
         if (pos == BUFFER_SIZE)
         {
             pos = 0;
             old_used = 0;
             new_used = 0;
         }
-        
+
         if (pos == old_used)
         {
-            int read_result = read(old_fd, old_buf + old_used, BUFFER_SIZE - old_used);
-            if (read_result == -1)
-            {
-                std::cerr << "IO error\n";
-                _exit(3);
-            }
+            int read_result = safe_read(old_fd, old_buf + old_used, BUFFER_SIZE - old_used);
             old_eof = read_result == 0;
             old_used += read_result;
         }
 
         if (pos == new_used)
         {
-            int read_result = read(new_fd, new_buf + new_used, BUFFER_SIZE - new_used);
-            if (read_result == -1)
-            {
-                std::cerr << "IO error\n";
-                _exit(4);
-            }
+            int read_result = safe_read(new_fd, new_buf + new_used, BUFFER_SIZE - new_used);
             new_eof = read_result == 0;
             new_used += read_result;
         }
@@ -115,12 +144,14 @@ bool compare_files(int old_fd, int new_fd)
         {
             equal = false;
             break;
-        } else if (old_eof && new_eof)
+        }
+        else if (old_eof && new_eof)
         {
             break;
         }
 
     }
+
     free(old_buf);
     free(new_buf);
     return equal;
@@ -128,13 +159,8 @@ bool compare_files(int old_fd, int new_fd)
 
 bool compare_files(std::string const& a, std::string const& b)
 {
-    int fd1 = open(a.c_str(), O_RDONLY);
-    int fd2 = open(b.c_str(), O_RDONLY);
-    if (fd1 == -1 || fd2 == -1)
-    {
-        std::cerr << "IO error\n";
-        _exit(5);
-    }
+    int fd1 = safe_open(a.c_str(), O_RDONLY);
+    int fd2 = safe_open(b.c_str(), O_RDONLY);
 
     bool result = compare_files(fd1, fd2);
     close(fd1);
@@ -253,13 +279,7 @@ private:
             return -1;
         }
 
-        int read_result = read(fd, buffer + buf_used, BUFFER_SIZE - buf_used);
-
-        if (read_result < 0)
-        {
-            std::cerr << "IO error" << std::endl;
-            _exit(7);
-        }
+        int read_result = safe_read(fd, buffer + buf_used, BUFFER_SIZE - buf_used);
 
         if (read_result == 0)
         {
@@ -273,7 +293,7 @@ private:
     }
 };
 
-void run_one(char** args, int fd_in, int fd_out)
+void run_one(char ** args, int fd_in, int fd_out)
 {
 //    std::cout << "Running " << args[0] << "\n";
 //    std::cout << "IN: " << fd_in << " OUT: " << fd_out << "\n";
@@ -282,19 +302,21 @@ void run_one(char** args, int fd_in, int fd_out)
         dup2(fd_in, STDIN_FILENO);
         close(fd_in);
     }
+
     if (fd_out != STDOUT_FILENO)
     {
         dup2(fd_out, STDOUT_FILENO);
         close(fd_out);
     }
+
     execvp(args[0], args);
     _exit(8);
 }
 
-void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_out)
+void run_all(std::vector<char **> const& commands, size_t pos, int fd_in, int fd_out)
 {
     int pipefd[2];
-    
+
     int pipe_in = fd_in;
     int pipe_out = fd_out;
 
@@ -316,19 +338,22 @@ void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_
             close(pipe_out);
             run_all(commands, pos + 1, pipe_in, fd_out);
             close(pipe_in);
-        } else
+        }
+        else
         {
             int status;
             waitpid(pid, &status, 0);
+
             if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
             {
                 std::cerr << "Command with number " << pos << " finished with code " << WEXITSTATUS(status) << "\n";
                 _exit(9);
             }
         }
-    } else 
+    }
+    else
     {
-        run_one(commands[pos], fd_in, pipe_out);    
+        run_one(commands[pos], fd_in, pipe_out);
     }
 }
 
@@ -341,79 +366,57 @@ int main(int argc, char ** argv)
         return 1;
     }
 
-    int fd = open(argv[1], O_RDONLY);
-
-    if (fd == -1)
-    {
-        std::cerr << "Unable to open file";
-        return 2;
-    }
+    int fd = safe_open(argv[1], O_RDONLY);
 
     std::vector<char **> commands;
-    reader_t reader(fd);
-    std::vector<std::string> current_command;
-
-    while (reader.has_next())
     {
-        std::string cur = reader.next_argument();
+        reader_t reader(fd);
+        std::vector<std::string> current_command;
 
-        if (cur == "|" || cur == "")
+        while (reader.has_next())
         {
-            char ** cmd = (char **) malloc((current_command.size() + 1) * sizeof(char *));
-            cmd[current_command.size()] = NULL;
+            std::string cur = reader.next_argument();
 
-
-            for (size_t i = 0; i < current_command.size(); i++)
+            if (cur == "|" || cur == "")
             {
-                cmd[i] = (char *) malloc((current_command[i].size() + 1) * sizeof(char));
-                memcpy((void *) cmd[i], (const void *) current_command[i].c_str(), sizeof(char) * current_command[i].size());
-                cmd[i][current_command[i].size()] = '\0';
-                if (!reader.has_next() && i == current_command.size() - 1)
+                char ** cmd = (char **) malloc((current_command.size() + 1) * sizeof(char *));
+                cmd[current_command.size()] = NULL;
+
+
+                for (size_t i = 0; i < current_command.size(); i++)
                 {
-                    cmd[i][current_command[i].size() - 1] = '\0';
+                    cmd[i] = (char *) malloc((current_command[i].size() + 1) * sizeof(char));
+                    memcpy((void *) cmd[i], (const void *) current_command[i].c_str(), sizeof(char) * current_command[i].size());
+                    cmd[i][current_command[i].size()] = '\0';
+
+                    if (!reader.has_next() && i == current_command.size() - 1)
+                    {
+                        cmd[i][current_command[i].size() - 1] = '\0';
+                    }
                 }
+
+                commands.push_back(cmd);
+                current_command.clear();
             }
-            commands.push_back(cmd);
-            current_command.clear();
-        }
-        else
-        {
-            current_command.push_back(cur);
+            else
+            {
+                current_command.push_back(cur);
+            }
         }
     }
-
-//    for (auto s: commands)
-//    {
-//        for (int i = 0; s[i] != NULL; i++)
-//        {
-//            std::cout << s[i] << " ";
-//        }
-//
-//        std::cout << "\n--\n";
-//
-//    }
 
     for (int i = 0;; i++)
     {
         int in_fd, out_fd;
         std::string tmp_file = TMP_BASE + std::to_string(i);
         std::string tmp_old = i == 0 ? "" : TMP_BASE + std::to_string(i - 1);
-        out_fd = open(tmp_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 00644);
-        if (out_fd == -1)
-        {
-            std::cerr << "IO error\n";
-            _exit(10);
-        }
+        out_fd = safe_open(tmp_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 00644);
 
-        in_fd = i == 0 ? STDIN_FILENO : open(tmp_old.c_str(), O_RDONLY);
-        if (in_fd == -1)
-        {
-            std::cerr << "IO error\n";
-            _exit(11);
-        }
+        in_fd = i == 0 ? STDIN_FILENO : safe_open(tmp_old.c_str(), O_RDONLY);
 
         run_all(commands, 0, in_fd, out_fd);
         close(out_fd);
+
         if (i != 0)
         {
             close(in_fd);
@@ -421,13 +424,14 @@ int main(int argc, char ** argv)
 
         if (i != 0 && compare_files(tmp_old, tmp_file))
         {
-            int out = open(tmp_file.c_str(), O_RDONLY);
-            copy_fd(out, STDOUT_FILENO); 
+            int out = safe_open(tmp_file.c_str(), O_RDONLY);
+            copy_fd(out, STDOUT_FILENO);
             close(out);
             remove(tmp_file.c_str());
             remove(tmp_old.c_str());
             break;
         }
+
         remove(tmp_old.c_str());
     }
 }
