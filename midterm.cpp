@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <cstring>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -147,13 +148,38 @@ int main(int argc, char ** argv)
         return 2;
     }
 
-    std::vector<std::string> command;
+    std::vector<char**> commands;
     reader_t reader(fd);
+    std::vector<std::string> current_command;
 
     while (reader.has_next())
     {
-        std::cout << reader.next_argument() << "\n--------\n";
+        std::string cur = reader.next_argument();
+        if (cur == "|" || cur == "")
+        {
+            char** cmd = (char **) malloc((current_command.size() + 1) * sizeof(char*));
+            cmd[current_command.size()] = NULL;
+            for (int i = 0; i < current_command.size(); i++)
+            {
+                cmd[i] = (char*) malloc((current_command[i].size() + 1) * sizeof(char));
+                memcpy((void*) cmd[i], (const void*) current_command[i].c_str(), sizeof(char) * current_command[i].size());
+                cmd[i][current_command[i].size()] = '\0';
+            }
+            commands.push_back(cmd);
+            current_command.clear();
+        } else {
+            current_command.push_back(cur);
+        }
     }
 
+    for (auto s: commands)
+    {
+        for (int i = 0; s[i] != NULL; i++)
+        {
+            std::cout << s[i] << " ";
+        }
+        std::cout << "\n--\n";
+
+    }
 }
 
