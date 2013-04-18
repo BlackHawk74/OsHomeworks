@@ -45,8 +45,72 @@ void copy_fd(int from, int to) {
     free(buf);
 }
 
+
 const int BUFFER_SIZE = 1024;
 const char DELIMITER = ' ';
+
+bool compare_files(int old_fd, int new_fd)
+{
+    char *old_buf = (char*) malloc(BUFFER_SIZE * sizeof(char));
+    char *new_buf = (char*) malloc(BUFFER_SIZE * sizeof(char));
+
+    int old_used = 0, new_used = 0;
+    int pos = 0;
+    bool old_eof = false;
+    bool new_eof = false;
+
+    bool equal = true;
+
+    while(true)
+    {
+        for (; pos < old_used && pos < new_used; pos++)
+        {
+            if (old_buf[pos] != new_buf[pos])
+            {
+                equal = false;
+                break;
+            }
+        }
+        if (!equal)
+        {
+            break;
+        }
+            
+        if (pos == BUFFER_SIZE)
+        {
+            pos = 0;
+            old_used = 0;
+            new_used = 0;
+        }
+        
+        if (pos == old_used)
+        {
+            int read_result = read(old_fd, old_buf + old_used, BUFFER_SIZE - old_used);
+            if (read_result == -1)
+            {
+                std::cerr << "IO error\n";
+                _exit(6);
+            }
+            old_eof = read_result == 0;
+            old_used += read_result;
+        }
+
+        if (pos == new_used)
+        {
+            int read_result = read(new_fd, new_buf + new_used, BUFFER_SIZE - new_used);
+            if (read_result == -1)
+            {
+                std::cerr << "IO error\n";
+                _exit(6);
+            }
+            new_eof = read_result == 0;
+            new_used += read_result;
+        }
+    }
+    free(old_buf);
+    free(new_buf);
+    return equal;
+}
 
 enum class state_t
 {
