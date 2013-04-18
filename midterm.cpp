@@ -275,8 +275,8 @@ private:
 
 void run_one(char** args, int fd_in, int fd_out)
 {
-    std::cout << "Running " << args[0] << "\n";
-    std::cout << "IN: " << fd_in << " OUT: " << fd_out << "\n";
+//    std::cout << "Running " << args[0] << "\n";
+//    std::cout << "IN: " << fd_in << " OUT: " << fd_out << "\n";
     if (fd_in != STDIN_FILENO)
     {
         dup2(fd_in, STDIN_FILENO);
@@ -298,7 +298,7 @@ void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_
     int pipe_in = fd_in;
     int pipe_out = fd_out;
 
-    std::cout << "Running command " << pos << "\n";
+//    std::cout << "Running command " << pos << "\n";
 
     if (pos != commands.size() - 1)
     {
@@ -382,16 +382,16 @@ int main(int argc, char ** argv)
         }
     }
 
-    for (auto s: commands)
-    {
-        for (int i = 0; s[i] != NULL; i++)
-        {
-            std::cout << s[i] << " ";
-        }
-
-        std::cout << "\n--\n";
-
-    }
+//    for (auto s: commands)
+//    {
+//        for (int i = 0; s[i] != NULL; i++)
+//        {
+//            std::cout << s[i] << " ";
+//        }
+//
+//        std::cout << "\n--\n";
+//
+//    }
 
     for (int i = 0;; i++)
     {
