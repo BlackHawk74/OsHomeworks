@@ -317,30 +317,6 @@ void run_all(std::vector<char**> const& commands, size_t pos, int fd_in, int fd_
 }
 
 
-void init()
-{
-    int fd = open(TMP_OLD, O_WRONLY | O_CREAT, 00644);
-
-    if (fd == -1)
-    {
-        std::cerr << "IO error\n";
-        _exit(12);
-    }
-
-//    const int bs = 1024;
-//    char * buf = (char *) malloc(bs * sizeof(char));
-//    int read_result = 0;
-//
-//    while((read_result = read(STDIN_FILENO, buf, bs)) > 0)
-//    {
-//        write_all(fd, buf, read_result);
-//    }
-
-    copy_fd(STDIN_FILENO, fd);
-    close(fd);
-}
-
-
 int main(int argc, char ** argv)
 {
     if (argc < 2)
@@ -390,8 +366,6 @@ int main(int argc, char ** argv)
         }
     }
 
-    //init();
-
     for (auto s: commands)
     {
         for (int i = 0; s[i] != NULL; i++)
@@ -403,6 +377,5 @@ int main(int argc, char ** argv)
 
     }
 
-    run_all(commands, 0, STDIN_FILENO, STDOUT_FILENO);
 }
 
