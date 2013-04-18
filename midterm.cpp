@@ -8,6 +8,43 @@
 #include <cstdlib>
 #include <vector>
 
+void write_all(int fd, char * buf, size_t count)
+{
+    int written;
+
+    for (written = 0; written < count;)
+    {
+        int t = write(fd, buf + written, count - written);
+
+        if (t == -1) 
+        {
+            std::cerr << "IO error\n";
+            _exit(4);
+        }
+
+        written += t;
+    }
+}
+
+void copy_fd(int from, int to) {
+    const int bs = 1024;
+    char * buf = (char *) malloc(bs * sizeof(char));
+    int read_result = 0;
+
+    while((read_result = read(from, buf, bs)) > 0)
+    {
+        write_all(to, buf, read_result);
+    }
+
+    if (read_result == -1)
+    {
+        std::cerr << "IO error\n";
+        _exit(15);
+    }
+
+    free(buf);
+}
+
 const int BUFFER_SIZE = 1024;
 const char DELIMITER = ' ';
 
@@ -88,7 +125,6 @@ public:
         }
 
         return result;
-
     }
 
     bool has_next()
@@ -168,12 +204,11 @@ void run_commands(std::vector<char **> const& commands)
                 close(prev_pipe);
             }
 
-            prev_pipe = pipefd[0];
 
             if (i == commands.size() - 1)
             {
-                tmp_fd = open(TMP_FILE, O_WRONLY);
-                dup2(tmp_fd, pipefd[0]);
+                tmp_fd = open(TMP_FILE, O_WRONLY | O_CREAT, 00644);
+                copy_fd(pipefd[0], tmp_fd);
                 close(tmp_fd);
                 int status;
                 waitpid(pid, &status, 0);
@@ -184,12 +219,17 @@ void run_commands(std::vector<char **> const& commands)
                 }
                 else
                 {
+                    std::cerr << "Command did not exit correctly\n";
                     _exit(11);
                 }
+            } else
+            {
+                prev_pipe = pipefd[0];
             }
-        }
-        else
+        } else
         {
+            std::cout << "executing: " << commands[i][0] << "\n";
+            std::cout << "prev_pipe " << prev_pipe << "pipefd[1] " << pipefd[1] << "\n";
             dup2(pipefd[1], STDOUT_FILENO);
             close(pipefd[0]);
             close(pipefd[1]);
@@ -212,29 +252,11 @@ void run_commands(std::vector<char **> const& commands)
     }
 }
 
-void write_all(int fd, char * buf, size_t count)
-{
-    int written;
-
-    // write() has no guarantee to write everything
-    for (written = 0; written < count;)
-    {
-        int t = write(fd, buf + written, count - written);
-
-        if (t == -1) // Write failed
-        {
-            std::cerr << "IO error\n";
-            _exit(4);
-        }
-
-        written += t;
-    }
-}
 
 
 void init()
 {
-    int fd = open(TMP_OLD, O_WRONLY);
+    int fd = open(TMP_OLD, O_WRONLY | O_CREAT, 00644);
 
     if (fd == -1)
     {
@@ -242,15 +264,16 @@ void init()
         _exit(12);
     }
 
-    const int bs = 1024;
-    char * buf = (char *) malloc(bs * sizeof(char));
-    int read_result = 0;
+//    const int bs = 1024;
+//    char * buf = (char *) malloc(bs * sizeof(char));
+//    int read_result = 0;
+//
+//    while((read_result = read(STDIN_FILENO, buf, bs)) > 0)
+//    {
+//        write_all(fd, buf, read_result);
+//    }
 
-    while((read_result = read(STDIN_FILENO, buf, bs)) > 0)
-    {
-        write_all(fd, buf, read_result);
-    }
-
+    copy_fd(STDIN_FILENO, fd);
     close(fd);
 }
 
@@ -284,13 +307,17 @@ int main(int argc, char ** argv)
             char ** cmd = (char **) malloc((current_command.size() + 1) * sizeof(char *));
             cmd[current_command.size()] = NULL;
 
+
             for (int i = 0; i < current_command.size(); i++)
             {
                 cmd[i] = (char *) malloc((current_command[i].size() + 1) * sizeof(char));
                 memcpy((void *) cmd[i], (const void *) current_command[i].c_str(), sizeof(char) * current_command[i].size());
                 cmd[i][current_command[i].size()] = '\0';
+                if (!reader.has_next() && i == current_command.size() - 1)
+                {
+                    cmd[i][current_command[i].size() - 1] = '\0';
+                }
             }
-
             commands.push_back(cmd);
             current_command.clear();
         }
