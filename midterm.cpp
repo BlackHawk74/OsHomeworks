@@ -106,6 +106,16 @@ bool compare_files(int old_fd, int new_fd)
             new_eof = read_result == 0;
             new_used += read_result;
         }
+
+        if (old_eof ^ new_eof)
+        {
+            equal = false;
+            break;
+        } else if (old_eof && new_eof)
+        {
+            break;
+        }
+
     }
     free(old_buf);
     free(new_buf);
