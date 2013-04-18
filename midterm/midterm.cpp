@@ -159,8 +159,8 @@ bool compare_files(int old_fd, int new_fd)
 
 bool compare_files(std::string const& a, std::string const& b)
 {
-    int fd1 = safe_open(a.c_str(), O_RDONLY);
-    int fd2 = safe_open(b.c_str(), O_RDONLY);
+    int fd1 = safe_open(a, O_RDONLY);
+    int fd2 = safe_open(b, O_RDONLY);
 
     bool result = compare_files(fd1, fd2);
     close(fd1);
@@ -410,9 +410,9 @@ int main(int argc, char ** argv)
         int in_fd, out_fd;
         std::string tmp_file = TMP_BASE + std::to_string(i);
         std::string tmp_old = i == 0 ? "" : TMP_BASE + std::to_string(i - 1);
-        out_fd = safe_open(tmp_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 00644);
+        out_fd = safe_open(tmp_file, O_WRONLY | O_CREAT | O_TRUNC, 00644);
 
-        in_fd = i == 0 ? STDIN_FILENO : safe_open(tmp_old.c_str(), O_RDONLY);
+        in_fd = i == 0 ? STDIN_FILENO : safe_open(tmp_old, O_RDONLY);
 
         run_all(commands, 0, in_fd, out_fd);
         close(out_fd);
@@ -424,7 +424,7 @@ int main(int argc, char ** argv)
 
         if (i != 0 && compare_files(tmp_old, tmp_file))
         {
-            int out = safe_open(tmp_file.c_str(), O_RDONLY);
+            int out = safe_open(tmp_file, O_RDONLY);
             copy_fd(out, STDOUT_FILENO);
             close(out);
             remove(tmp_file.c_str());
