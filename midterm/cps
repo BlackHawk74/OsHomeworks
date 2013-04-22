@@ -1,0 +1,189 @@
+Process = r~>Context
+
+r~>Context = {
+    operator() // execution 
+    *r
+    ProcessInfo processInfo
+    fdTable : Map<int, FdId>
+}
+
+FdId = {
+    data_t * data
+    mode_t modes
+}
+
+ProcessInfo = {
+    int pid
+    int ppid
+}
+
+Context = {
+    Tag syscallTag
+    Args<Tag> args
+    Process<Ret<syscallTag>> cont
+}
+
+PipeState = {
+    bool reading_started
+    bool writing_started
+}
+
+Pipe = {
+    int pipe_id
+    Iterator data_start
+    Iterator data_end
+    PipeState state
+}
+
+Pipes = {
+    map<int, set<int>> reading // pipe_id -> set<pid>
+    map<int, set<int>> writing
+}
+
+kernel()
+{
+    running = []
+    waiting = multimap<Tag, pair<Process, Context>>
+    
+    foreach(item in waiting[readTag])
+    {
+        proc = item.first
+        context = item.second
+
+        fd = context.args[0]
+        if (hasData(proc.fdTable[fd].data))
+        {
+            buf = context.args[1]
+            count = max(context.args[2], dataCount(proc.fdTable[fd].data))
+            start_ptr = dataStart(proc.fdTable[fd].data)
+            copy(start_ptr, start_ptr + count, buf) 
+            running.append(makeProcess(proc, context.cont(count)))
+        }
+    }
+
+    while true
+    {
+        cur = head (running)
+        curContext = cur ()
+
+        switch cur.syscallTag
+        {
+            case lazyForkTag: 
+                int pid = newPid()
+                
+                running.append(makeProcess(cur, cur.cont(pid)))
+
+                foreach (fd in cur.fdTable)
+                {
+                    if (isPipeReading(fd) && isPipeWriting(fd + 1))
+                    {
+                        Pipe pipe = (Pipe) *(cur.fdTable[fd].data)
+                        Pipes.writing[pipe.pipe_id].put(pid)
+                    }
+                }
+
+                waiting[lazyForkTag].append(makeProcess(cur, null, pid: pid, ppid: cur.pid), curContext)
+                break
+            case pipeTag:
+                int read_end = nextFd(cur.fdTable)
+                int write_end = nextFd(cur.fdTable)
+                Pipe pipe = makePipe()
+                Pipes.reading[pipe.id].put(cur.pid)
+                Pipes.writing[pipe.id].put(cur.pid)
+
+                cur.fdTable.put(read_end, makeFdId(pipe, mode_read))
+                cur.fdTable.put(write_end, makeFdId(pipe, mode_write))
+                curContext.args[0] = read_end
+                curContext.args[1] = write_end
+
+                running.append(makeProcess(cur, cur.cont(0)))
+
+                break
+                
+            case readTag:
+                int fd = curContext.args[0]
+                if (!cur.fdTable.contains(fd) || !checkPermissions(cur.fdTable[fd], READ))
+                {
+                    running.append(makeProcess(cur, curContext.cont(-1)))
+                    break
+                }
+
+                if (isPipe(cur.fdTable[fd].data))
+                {
+                    Pipe pipe = (Pipe) *(cur.fdTable[fd])
+                    foreach(pid in Pipes.writing[pipe.pipe_id])
+                    {
+                        if ((item = waiting[lazyForkTag].get(pid)) != null)
+                        {
+                            running.append(makeProcess(item.first, item.second.cont(0)))
+                        }
+                    }
+
+                    if (Pipes[pipe.pipe_id].writing.empty() && pipe.data_start == pipe.data_end)
+                    { // EOF
+                        running.append(makeProcess(cur, curContext.cont(0)))
+                        break
+                    }
+
+                }
+
+                waiting[readTag].put(makeProcess(cur, null), curContext)
+
+            case writeTag:
+                int fd = curContext.args[0]
+                char * buf = curContext.args[1]
+                int count = curContext.args[2]
+                if (!cur.fdTable.contains(fd)) || !checkPermissions(cur.fdTable[fd], WRITE)
+                {
+                    running.append(makeProcess(cur, curContext.cont(-1)))
+                    break
+                }
+
+                if (isPipe(cur.fdTable[fd].data))
+                {
+
+                    Pipe pipe = (Pipe) *(cur.fdTable[fd])
+                    if (Pipes[pipe.pipe_id].reading.empty())
+                    {
+                        running.append(makeProcess(cur, curContext.cont(-1)))
+                        break
+                    }
+                }
+
+                int result = copy(buf, buf + count, cur.fdTable[fd].data->writePosition)
+                running.append(makeProcess(cur, curContext.cont(result)))
+                
+            case closeTag:
+               if (!cur.fdTable.contains(curContext.args[0]))
+               {
+                   ret = -1
+               } else
+               {
+                   data_t data = cur.fdTable[curContext.args[0]].data
+                   if (*data is Pipe)
+                   {
+                       Pipe pipe = (Pipe) *data
+                       if (isReading(curContext.args[0]))
+                       {
+                            Pipes.reading.remove(cur.pid)
+                            foreach(pid in Pipes.writing[pipe.pipe_id])
+                            {
+                                if (waiting[lazyForkTag].contains(pid))
+                                {
+                                    waiting[lazyForkTag].remove(pid)
+                                }
+                            }
+                       } else
+                       {
+                           Pipes.writing.remove(cur.pid)
+                       }
+                    }
+                   
+                    ret = 0
+                    fdTable.remove(curContext[0])
+               }
+               running.append(curContext.cont(ret))
+        }
+    }
+
+}
