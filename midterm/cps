@@ -23,16 +23,11 @@ Context = {
     Process<Ret<syscallTag>> cont
 }
 
-PipeState = {
-    bool reading_started
-    bool writing_started
-}
 
 Pipe = {
     int pipe_id
     Iterator data_start
     Iterator data_end
-    PipeState state
 }
 
 Pipes = {
@@ -45,24 +40,10 @@ kernel()
     running = []
     waiting = multimap<Tag, pair<Process, Context>>
     
-    foreach(item in waiting[readTag])
-    {
-        proc = item.first
-        context = item.second
-
-        fd = context.args[0]
-        if (hasData(proc.fdTable[fd].data))
-        {
-            buf = context.args[1]
-            count = max(context.args[2], dataCount(proc.fdTable[fd].data))
-            start_ptr = dataStart(proc.fdTable[fd].data)
-            copy(start_ptr, start_ptr + count, buf) 
-            running.append(makeProcess(proc, context.cont(count)))
-        }
-    }
-
+    
     while true
     {
+
         cur = head (running)
         curContext = cur ()
 
@@ -126,8 +107,19 @@ kernel()
                     }
 
                 }
-
-                waiting[readTag].put(makeProcess(cur, null), curContext)
+                
+                if (hasData(cur.fdTable[fd].data))
+                {
+                    buf = curContext.args[1]
+                    count = max(curContext.args[2], dataCount(cur.fdTable[fd].data))
+                    start_ptr = dataStart(cur.fdTable[fd].data)
+                    copy(start_ptr, start_ptr + count, buf) 
+                    running.append(makeProcess(cur, context.cont(count)))
+                } else 
+                {
+                    waiting[readTag].put(makeProcess(cur, null), curContext)
+                }
+                break
 
             case writeTag:
                 int fd = curContext.args[0]
@@ -150,8 +142,26 @@ kernel()
                     }
                 }
 
+                
                 int result = copy(buf, buf + count, cur.fdTable[fd].data->writePosition)
                 running.append(makeProcess(cur, curContext.cont(result)))
+                foreach (item in waiting[readTag])
+                {
+                    proc = item.first
+                    context = item.second
+
+                    fd = context.args[0]
+                    if (hasData(proc.fdTable[fd].data))
+                    {
+                        buf = context.args[1]
+                        count = max(context.args[2], dataCount(proc.fdTable[fd].data))
+                        start_ptr = dataStart(proc.fdTable[fd].data)
+                        copy(start_ptr, start_ptr + count, buf) 
+                        running.append(makeProcess(proc, context.cont(count)))
+                    }
+                }
+
+                break
                 
             case closeTag:
                if (!cur.fdTable.contains(curContext.args[0]))
@@ -183,6 +193,7 @@ kernel()
                     fdTable.remove(curContext[0])
                }
                running.append(curContext.cont(ret))
+               break
         }
     }
 
