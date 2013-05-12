@@ -13,14 +13,13 @@
 void handler(int signum)
 {
     int fd = open("/tmp/daemon.sig", O_WRONLY | O_CREAT, 0644);
-    const char buf[] = "sughup\n";
+    const char buf[] = "sighup\n";
     write(fd, buf, strlen(buf));
     close(fd);
 }
 
 int main() {
-    pid_t pid = fork();
-    if (pid) {
+    if (fork()) {
         sleep(100);
     } else 
     {
@@ -38,11 +37,16 @@ int main() {
             close(slave);
             close(master);
             setsid(); 
-            perror(buf);
-            int ff = open(buf, O_RDWR);
-            close(ff);
-            perror("bar");
-            sleep(100);
+            if (!fork())
+            {
+                perror(buf);
+                int ff = open(buf, O_RDWR);
+                close(ff);
+                perror("bar");
+                sleep(100);
+            } else {
+                sleep(100);
+            }
         }
     }
     return 0;
