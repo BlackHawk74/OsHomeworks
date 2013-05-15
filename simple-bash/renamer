@@ -2,8 +2,7 @@
 
 for f; do
     if [[ -f $f ]]; then
-       echo `basename "$f"`
-       read newName
+       read -e -p "Enter new file name: " -i "$(basename "$f")" newName
        dirName=`dirname "$f"`
        mv "$f" "${dirName}/${newName}"
     fi
