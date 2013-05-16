@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-void write_all(int fd, char * buf, size_t count)
+void write_all(int fd, char * buf, int count)
 {
     int written;
     
@@ -84,12 +84,11 @@ int main(int argc, char** argv)
     cmd_argv[cmd_argc + 1] = NULL;
 
     int eof_reached = 0;
-    size_t buf_used = 0;
-    int read_count;
+    int buf_used = 0;
 
     while (1)
     {
-        read_count = read(STDIN_FILENO, buf + buf_used, buf_size - buf_used);
+        int read_count = read(STDIN_FILENO, buf + buf_used, buf_size - buf_used);
         
         if (read_count < 0) // IO error
         {
@@ -109,9 +108,9 @@ int main(int argc, char** argv)
             read_count++;
         }
 
-        size_t i;
-        size_t buf_max = buf_used + read_count;
-        size_t buf_last_element = 0;
+        int i;
+        int buf_max = buf_used + read_count;
+        int buf_last_element = 0;
 
         for (i = buf_used; i < buf_max; i++)
         {
