@@ -1,33 +1,41 @@
 #include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
-//#include <stdio.h>
 
 #define STDIN 0
 #define STDOUT 1
 
 
-enum state {
+typedef enum state {
     NORMAL, IGNORING
-} current_state;
+} state;
+
+void write_twice(char * buffer, int output_start, int output_end) 
+{
+    int i;
+    for (i = 0; i < 2; i++)
+    {
+        int write_start = output_start;
+        while (write_start < output_end)
+        {
+            int write_res = write(STDOUT, buffer + write_start, output_end - write_start);
+            if (write_res == -1)
+            {
+                _exit(3);
+            }
+            write_start += write_res;
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
-    int k;
-    char *buffer;
-    int len;
-    int read_res;
-    int output_start, output_end;
-    int i, j;
-    int write_start;
-    int write_res;
-    int eof_reached;
-
     if (argc < 2)
     {
         return 1;
     }
 
-    k = atoi(argv[1]);
+    int k = atoi(argv[1]);
 
     if (k < 1)
     {
@@ -35,14 +43,14 @@ int main(int argc, char** argv)
     }
 
     k++;
-    buffer = (char *) malloc(k);
-    len = 0;
-    current_state = NORMAL;
-    eof_reached = 0;
+    char * buffer = (char *) malloc(k);
+    int len = 0;
+    state current_state = NORMAL;
+    int eof_reached = 0;
 
     while (1)
     {
-        read_res = read(STDIN, buffer + len, k - len);
+        int read_res = read(STDIN, buffer + len, k - len);
         //printf("read_res = %d\n", read_res);
         if (read_res == 0) {
             // EOF
@@ -59,7 +67,11 @@ int main(int argc, char** argv)
             // Some read error
             return 4;
         }
-        output_start= 0;
+
+        int i;
+        int output_start= 0;
+        int output_end;
+
         for (i = len; i < len + read_res; ++i)
         {
             if (buffer[i] == '\n')
@@ -71,19 +83,7 @@ int main(int argc, char** argv)
                     current_state = NORMAL;
                 }
                 output_end = i + 1;
-                for (j = 0; j < 2; ++j)
-                {
-                    write_start = output_start;
-                    while (write_start < output_end)
-                    {
-                        write_res = write(STDOUT, buffer + write_start, output_end - output_start);
-                        if (write_res == -1)
-                        {
-                            return 3;
-                        }
-                        write_start += write_res;
-                    }
-                }
+                write_twice(buffer, output_start, output_end);
                 output_start = i + 1;
             }
         }
