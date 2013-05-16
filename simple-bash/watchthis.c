@@ -5,6 +5,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 const char* FIFO_OLD = "/tmp/watchthis_fifo0";
 const char* FIFO_NEW = "/tmp/watchthis_fifo1";
@@ -21,6 +22,19 @@ void exit_function()
     _exit(0);
 }
 
+void write_all(int fd, char * buf, int count)
+{
+    int written;
+    for (written = 0; written < count; )
+    {
+        int write_res = write(fd, buf + written, count - written);
+        if (write_res < 0) 
+        {
+            _exit(10);
+        }
+        written += write_res;
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -79,11 +93,8 @@ int main(int argc, char** argv)
             }
             close(pipefd[0]);
 
-            int written;
-            for (written = 0; written < used; )
-            {
-                written += write(STDOUT_FILENO, buf + written, used - written);
-            }
+            write_all(STDOUT_FILENO, buf, used);
+
             if (old_used > 0)
             {
 
@@ -92,14 +103,9 @@ int main(int argc, char** argv)
                     int fd0 = open(FIFO_OLD, O_WRONLY);
                     int fd1 = open(FIFO_NEW, O_WRONLY);
 
-                    for (written = 0; written < old_used;)
-                    {
-                        written += write(fd0, old_buf + written, old_used - written);
-                    }
-                    for (written = 0; written < used;)
-                    {
-                        written += write(fd1, buf + written, used - written);
-                    }
+                    
+                    write_all(fd0, old_buf, old_used);
+                    write_all(fd1, buf, used);
 
                     close(fd0);
                     close(fd1);
@@ -115,7 +121,6 @@ int main(int argc, char** argv)
             old_buf = buf;
             buf = t;
             old_used = used;
-
             sleep(interval);
 
         } else {
