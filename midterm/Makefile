@@ -1,2 +1,2 @@
 all: midterm.cpp
-	g++ -Wall -g -std=c++11 midterm.cpp -o midterm
+	g++ -Wall -Wextra -Werror -g -std=c++11 midterm.cpp -o midterm
