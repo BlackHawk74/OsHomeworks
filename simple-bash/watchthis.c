@@ -10,6 +10,14 @@
 const char* FIFO_OLD = "/tmp/watchthis_fifo0";
 const char* FIFO_NEW = "/tmp/watchthis_fifo1";
 
+void * safe_alloc(int count)
+{
+    void * result = malloc(count);
+    if (result == NULL)
+        _exit(125);
+    return result;
+}
+
 void remove_fifos()
 {
     remove(FIFO_OLD);
@@ -65,9 +73,9 @@ int main(int argc, char** argv)
 
     size_t buf_size = 100;
     size_t used = 0;
-    char * buf = (char*) malloc(buf_size);
+    char * buf = (char*) safe_alloc(buf_size);
 
-    char * old_buf = (char*) malloc(buf_size);
+    char * old_buf = (char*) safe_alloc(buf_size);
     size_t old_used = 0;
 
     while (1) {
