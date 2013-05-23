@@ -28,6 +28,14 @@ void write_twice(char * buffer, int output_start, int output_end)
     }
 }
 
+void * safe_alloc(int count)
+{
+    void * result = malloc(count);
+    if (result == NULL)
+        _exit(125);
+    return result;
+}
+
 int main(int argc, char** argv)
 {
     if (argc < 2)
@@ -43,7 +51,7 @@ int main(int argc, char** argv)
     }
 
     k++;
-    char * buffer = (char *) malloc(k);
+    char * buffer = (char *) safe_alloc(k);
     int len = 0;
     state current_state = NORMAL;
     int eof_reached = 0;
