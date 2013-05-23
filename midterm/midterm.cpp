@@ -14,6 +14,14 @@ const std::string TMP_BASE = "/tmp/midterm_";
 const int BUFFER_SIZE = 1024;
 const char DELIMITER = ' ';
 
+void * safe_alloc(int count)
+{
+    void * result = malloc(count);
+    if (result == NULL)
+        _exit(125);
+    return result;
+}
+
 int safe_read(int fd, char * buffer, size_t count)
 {
     int result = read(fd, buffer, count);
@@ -53,7 +61,7 @@ void write_all(int fd, char * buf, size_t count)
 void copy_fd(int from, int to)
 {
     const int bs = BUFFER_SIZE;
-    char * buf = (char *) malloc(bs * sizeof(char));
+    char * buf = (char *) safe_alloc(bs * sizeof(char));
     int read_result = 0;
 
     while((read_result = safe_read(from, buf, bs)) > 0)
@@ -93,8 +101,8 @@ int safe_open(std::string const& path, int flags, mode_t mode)
 
 bool compare_files(int old_fd, int new_fd)
 {
-    char * old_buf = (char *) malloc(BUFFER_SIZE * sizeof(char));
-    char * new_buf = (char *) malloc(BUFFER_SIZE * sizeof(char));
+    char * old_buf = (char *) safe_alloc(BUFFER_SIZE * sizeof(char));
+    char * new_buf = (char *) safe_alloc(BUFFER_SIZE * sizeof(char));
 
     int old_used = 0, new_used = 0;
     int pos = 0;
@@ -182,7 +190,7 @@ public:
           buf_start(0),
           eof(false),
           _has_next(true),
-          buffer((char *)malloc((BUFFER_SIZE + 1) * sizeof(char)))
+          buffer((char *)safe_alloc((BUFFER_SIZE + 1) * sizeof(char)))
     {}
 
 
@@ -379,13 +387,13 @@ int main(int argc, char ** argv)
 
             if (cur == "|" || cur == "")
             {
-                char ** cmd = (char **) malloc((current_command.size() + 1) * sizeof(char *));
+                char ** cmd = (char **) safe_alloc((current_command.size() + 1) * sizeof(char *));
                 cmd[current_command.size()] = NULL;
 
 
                 for (size_t i = 0; i < current_command.size(); i++)
                 {
-                    cmd[i] = (char *) malloc((current_command[i].size() + 1) * sizeof(char));
+                    cmd[i] = (char *) safe_alloc((current_command[i].size() + 1) * sizeof(char));
                     memcpy((void *) cmd[i], (const void *) current_command[i].c_str(), sizeof(char) * current_command[i].size());
                     cmd[i][current_command[i].size()] = '\0';
 
