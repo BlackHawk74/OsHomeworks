@@ -7,6 +7,14 @@
 #include <stdio.h>
 #include <string.h>
 
+void * safe_alloc(int count)
+{
+    void * result = malloc(count);
+    if (result == NULL)
+        _exit(125);
+    return result;
+}
+
 void write_all(int fd, char * buf, int count)
 {
     int written;
@@ -75,10 +83,10 @@ int main(int argc, char** argv)
 
     // One more char for delimiter
     buf_size++;
-    char * buf = malloc(sizeof(char) * buf_size);
+    char * buf = safe_alloc(buf_size);
 
     // Creating command to execute
-    char** cmd_argv = malloc(sizeof(char*) * (argc - opt_count + 2));
+    char** cmd_argv = safe_alloc(argc - opt_count + 2);
     int cmd_argc = argc - opt_count;
     memcpy(cmd_argv, argv + opt_count, sizeof(char*) * cmd_argc);
     cmd_argv[cmd_argc + 1] = NULL;
