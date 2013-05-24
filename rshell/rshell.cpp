@@ -30,7 +30,14 @@ int main(int, char **)
         _exit(EXIT_FAILURE);
     }
 
-    
+    int sockfd = socket(result->ai_family, result->ai_socktype,
+                           result->ai_protocol);
+
+    if (sockfd == -1)
+    {
+        std::cerr << "Error opening socket\n";
+        _exit(EXIT_FAILURE);
+    }
 
 }
 
