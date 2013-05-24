@@ -47,9 +47,15 @@ int main(int, char **)
         if (ss != 0)
         {
             std::cerr << "Socket options not set\n";
+            _exit(EXIT_FAILURE);
         }
     }
 
+    if (!bind(sockfd, result->ai_addr, result->ai_addrlen))
+    {
+        std::cerr << "Could not bind socket\n";
+        _exit(EXIT_FAILURE);
+    }
 
 
 }
