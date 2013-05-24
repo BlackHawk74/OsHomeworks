@@ -23,11 +23,13 @@ int main(int, char **)
     hints.ai_addr = NULL;
     hints.ai_next = NULL;
 
-    int ainfo = getaddrinfo(NULL, "8822", &hints, &result);
-    if (ainfo != 0)
     {
-        std::cerr << "Error in getaddrinfo()" << std::endl;
-        _exit(EXIT_FAILURE);
+        int ainfo = getaddrinfo(NULL, "8822", &hints, &result);
+        if (ainfo != 0)
+        {
+            std::cerr << "Error in getaddrinfo()" << std::endl;
+            _exit(EXIT_FAILURE);
+        }
     }
 
     int sockfd = socket(result->ai_family, result->ai_socktype,
@@ -38,6 +40,17 @@ int main(int, char **)
         std::cerr << "Error opening socket\n";
         _exit(EXIT_FAILURE);
     }
+
+    {
+        int optval = 1;
+        int ss = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+        if (ss != 0)
+        {
+            std::cerr << "Socket options not set\n";
+        }
+    }
+
+
 
 }
 
