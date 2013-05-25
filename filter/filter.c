@@ -86,7 +86,7 @@ int main(int argc, char** argv)
     char * buf = safe_alloc(buf_size);
 
     // Creating command to execute
-    char** cmd_argv = safe_alloc(argc - opt_count + 2);
+    char** cmd_argv = safe_alloc((argc - opt_count + 2) * sizeof(char*));
     int cmd_argc = argc - opt_count;
     memcpy(cmd_argv, argv + opt_count, sizeof(char*) * cmd_argc);
     cmd_argv[cmd_argc + 1] = NULL;
