@@ -153,6 +153,7 @@ int main(int, char **)
                     free(buf);
                     close(master);
                     close(fd);
+                    _exit(0);
                 } else
                 {
                     close(master);
