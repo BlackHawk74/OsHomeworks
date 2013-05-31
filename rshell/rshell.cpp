@@ -45,6 +45,18 @@ void set_nonblock(int fd)
     fcntl(fd, F_SETFL, O_NONBLOCK | flags);
 }
 
+bool exchange_data(int fd1, int fd2, char * buf, int buf_size)
+{
+    int r1 = read(fd1, buf, buf_size);
+    if (r1 > 0)
+        write_all(fd2, buf, r1);
+    else if (r1 == 0)
+        return false;
+    else if (r1 == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
+        return false;
+    return true;
+}
+
 pid_t pid;
 
 void handler(int) {
@@ -150,21 +162,11 @@ int main(int, char **)
 
                     while (true)
                     {
-                        int r1 = read(master, buf, BUF_SIZE);
-                        if (r1 > 0)
-                            write_all(fd, buf, r1);
-                        else if (r1 == 0)
+                        if (!exchange_data(master, fd, buf, BUF_SIZE)
+                            || !exchange_data(fd, master, buf, BUF_SIZE))
+                        {
                             break;
-                        else if (r1 == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
-                            break;
-
-                        int r2 = read(fd, buf, BUF_SIZE);
-                        if (r2 > 0)
-                            write_all(master, buf, r2);
-                        else if (r2 == 0)
-                            break;
-                        else if (r2 == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
-                            break;
+                        }
 
                         sleep(1);
                     }
