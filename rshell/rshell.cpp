@@ -1,4 +1,5 @@
 #include <iostream>
+#include <poll.h>
 #include <errno.h>
 #include <pty.h>
 #include <string>
@@ -20,14 +21,14 @@ int safe_open(const char * path, int flags)
 
     if (fd == -1)
     {
-        std::cerr << "IO error\n";
+        //        std::cerr << "IO error\n";
         _exit(20);
     }
 
     return fd;
 }
 
-void write_all(int fd, char * buf, int count)
+void write_all(int fd, const char * buf, int count)
 {
     int written;
 
@@ -74,8 +75,14 @@ int main(int, char **)
         int status;
         waitpid(pid, &status, 0);
         std::cout << "Daemon stopped" << std::endl;
-    } else 
+    } else
     {
+        int log_fd = dup(STDOUT_FILENO);
+        if (log_fd == -1)
+        {
+            _exit(43);
+        }
+
         close(STDIN_FILENO);
         close(STDOUT_FILENO);
         close(STDERR_FILENO);
@@ -83,7 +90,7 @@ int main(int, char **)
 
         addrinfo hints;
         memset(&hints, 0, sizeof(addrinfo));
-         
+
         // Setting connection options
         hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
         hints.ai_socktype = SOCK_STREAM; /* TCP socket */
@@ -102,7 +109,7 @@ int main(int, char **)
 
         // Creating socket
         int sockfd = socket(result->ai_family, result->ai_socktype,
-                               result->ai_protocol);
+                            result->ai_protocol);
 
         if (sockfd == -1)
             _exit(EXIT_FAILURE);
@@ -129,10 +136,12 @@ int main(int, char **)
             _exit(EXIT_FAILURE);
         }
 
-        while (true) 
+        while (true)
         {
             // Waiting for somebody to connect
             int fd = accept(sockfd, result->ai_addr, &result->ai_addrlen);
+            const char msg[] = "Connection received\n";
+            write_all(log_fd, msg, strlen(msg));
 
             if (fork())
             {
@@ -153,31 +162,55 @@ int main(int, char **)
                 {
                     // Stupid exchange of data between client and terminal
                     close(slave);
-                    set_nonblock(master);
-                    set_nonblock(fd);
+//                    set_nonblock(master);
+//                    set_nonblock(fd);
 
                     const int BUF_SIZE = 4096;
-
                     char buf[BUF_SIZE];
 
+                    const int nfds = 2;
+                    pollfd fds[nfds];
+                    fds[0].fd = master;
+                    fds[1].fd = fd;
+
+                    const short ERR_CODES = POLLERR | POLLHUP | POLLNVAL | POLLRDHUP;
+
+                    fds[0].events = fds[1].events = POLLIN | ERR_CODES;
                     while (true)
                     {
-                        if (!exchange_data(master, fd, buf, BUF_SIZE)
-                            || !exchange_data(fd, master, buf, BUF_SIZE))
+                        int res = poll(fds, nfds, -1);
+                        if (res < 0)
+                        {
+                            _exit(42);
+                        }
+
+                        if ((fds[0].revents & ERR_CODES) || (fds[1].revents & ERR_CODES))
                         {
                             break;
                         }
 
-                        sleep(1);
+                        if (fds[0].revents & POLLIN)
+                        {
+                            exchange_data(master, fd, buf, BUF_SIZE);
+                        }
+
+                        if (fds[1].revents & POLLIN)
+                        {
+                            exchange_data(fd, master, buf, BUF_SIZE);
+                        }
                     }
                     close(master);
                     close(fd);
+                    const char msg[] = "Connection closed\n";
+                    write_all(log_fd, msg, strlen(msg));
+                    close(log_fd);
                     _exit(0);
                 } else
                 {
                     // Creating a session and running shell in it
                     close(master);
                     close(fd);
+                    close(log_fd);
                     setsid();
 
                     int pty_fd = safe_open(name, O_RDWR);
@@ -194,7 +227,6 @@ int main(int, char **)
                 }
             }
         }
-        
     }
 }
 
