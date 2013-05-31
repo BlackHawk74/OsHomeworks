@@ -39,6 +39,12 @@ void write_all(int fd, char * buf, int count)
     }
 }
 
+void set_nonblock(int fd)
+{
+    int flags = fcntl(fd, F_GETFL);
+    fcntl(fd, F_SETFL, O_NONBLOCK | flags);
+}
+
 pid_t pid;
 
 void handler(int) {
@@ -135,8 +141,8 @@ int main(int, char **)
                 {
                     // Stupid exchange of data between client and terminal
                     close(slave);
-                    fcntl(master, F_SETFL, O_NONBLOCK);
-                    fcntl(fd, F_SETFL, O_NONBLOCK);
+                    set_nonblock(master);
+                    set_nonblock(fd);
 
                     const int BUF_SIZE = 4096;
 
