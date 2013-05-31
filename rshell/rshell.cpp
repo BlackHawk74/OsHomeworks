@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 const int BACKLOG = 64;
+const int BUF_SIZE = 4096;
 
 int safe_open(const char * path, int flags)
 {
@@ -55,6 +56,51 @@ bool exchange_data(int fd1, int fd2, char * buf, int buf_size)
         return false;
     else if (r1 == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
         return false;
+    return true;
+}
+
+bool try_read(pollfd& in, pollfd& out, char * buf, int& buf_start, int& buf_end)
+{
+    if (in.revents & POLLIN)
+    {
+        int r = read(in.fd, buf + buf_end, BUF_SIZE - buf_end);
+        if (r > 0)
+        {
+            buf_end += r;
+            if (buf_end == BUF_SIZE)
+            {
+                in.events ^= POLLIN;
+            }
+            if (buf_end - buf_start > 0)
+            {
+                out.events |= POLLOUT;
+            }
+            return true;
+        }
+        return false;
+    }
+    return true;
+}
+
+bool try_write(pollfd& in, pollfd& out, char * buf, int& buf_start, int& buf_end)
+{
+    if (buf_end == buf_start) return true;
+    if (out.revents & POLLOUT)
+    {
+        int w = write(out.fd, buf + buf_start, buf_end - buf_start);
+        if (w > 0)
+        {
+            buf_start += w;
+            if (buf_end == buf_start)
+            {
+                out.events ^= POLLOUT;
+                buf_end = buf_start = 0;
+                in.events |= POLLIN;
+            }
+            return true;
+        }
+        return false;
+    }
     return true;
 }
 
@@ -165,8 +211,9 @@ int main(int, char **)
 //                    set_nonblock(master);
 //                    set_nonblock(fd);
 
-                    const int BUF_SIZE = 4096;
-                    char buf[BUF_SIZE];
+                    char buf[BUF_SIZE], buf2[BUF_SIZE];
+                    int buf_start = 0, buf_end = 0;
+                    int buf2_start = 0, buf2_end = 0;
 
                     const int nfds = 2;
                     pollfd fds[nfds];
@@ -189,15 +236,14 @@ int main(int, char **)
                             break;
                         }
 
-                        if (fds[0].revents & POLLIN)
+                        if (!try_read(fds[0], fds[1], buf, buf_start, buf_end)
+                            || !try_write(fds[0], fds[1], buf, buf_start, buf_end)
+                            || !try_read(fds[1], fds[0], buf2, buf2_start, buf2_end)
+                            || !try_write(fds[1], fds[0], buf2, buf2_start, buf2_end))
                         {
-                            exchange_data(master, fd, buf, BUF_SIZE);
+                            break;
                         }
 
-                        if (fds[1].revents & POLLIN)
-                        {
-                            exchange_data(fd, master, buf, BUF_SIZE);
-                        }
                     }
                     close(master);
                     close(fd);
