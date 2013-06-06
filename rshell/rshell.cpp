@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "protocol.h"
 
 const int BACKLOG = 64;
 const int BUF_SIZE = 4096;
@@ -206,10 +207,8 @@ int main(int, char **)
 
                 if (fork())
                 {
-                    // Stupid exchange of data between client and terminal
+                    // Exchanging data between network socket and terminal using poll
                     close(slave);
-//                    set_nonblock(master);
-//                    set_nonblock(fd);
 
                     char buf[BUF_SIZE], buf2[BUF_SIZE];
                     int buf_start = 0, buf_end = 0;
