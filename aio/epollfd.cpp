@@ -1,4 +1,6 @@
 #include "epollfd.h"
+#include <iostream>
+#include <errno.h>
 
 static const int MAX_EVENTS = 10;
 
@@ -11,36 +13,42 @@ epollfd::epollfd()
     }
 }
 
-void epollfd::add_to_epoll(int fd, int what)
+bool epollfd::add_to_epoll(int fd)
 {
+    std::cout << "adding to epoll " << fd << std::endl;
     epoll_event event;
-    event.events = what;
+    event.events = flags[fd];
     event.data.fd = fd;
 
     if (epoll_ctl(efd, EPOLL_CTL_ADD, fd, &event))
     {
-        throw std::runtime_error("could not add event to epoll");
+        return false;
     }
+    return true;
 }
 
-void epollfd::del_from_epoll(int fd)
+bool epollfd::del_from_epoll(int fd)
 {
+    std::cout << "deleting from epoll " << fd << std::endl;
     if (epoll_ctl(efd, EPOLL_CTL_DEL, fd, NULL))
     {
-        throw std::runtime_error("could not delete event from epoll");
+        return false;
     }
+    return true;
 }
 
-void epollfd::mod_epoll(int fd)
+bool epollfd::mod_epoll(int fd)
 {
+    std::cout << "modifying epoll " << fd << std::endl;
     epoll_event event;
     event.events = flags[fd];
     event.data.fd = fd;
 
     if(epoll_ctl(efd, EPOLL_CTL_MOD, fd, &event)) 
     {
-        throw std::runtime_error("could not mod epoll");
+        return false;
     }
+    return true;
 }
 
 
@@ -49,11 +57,15 @@ void epollfd::subscribe(int fd, int what, std::function<void()> const& cont, std
     auto fd_row = data.find(fd);
     if (fd_row == data.end())
     {
-        add_to_epoll(fd, what);
+        flags[fd] = what;
+        if (!add_to_epoll(fd))
+        {
+            flags.erase(fd);
+            throw std::runtime_error("could not add to epoll");
+        }
         std::unordered_map<int, std::pair<std::function<void()>, std::function<void()>>> new_row;
         new_row.insert(std::make_pair(what, std::make_pair(cont, cont_err)));
         data.insert(std::make_pair(fd, new_row));
-        flags[fd] = what;
     } else 
     {
         auto& row = (*fd_row).second;
@@ -62,20 +74,18 @@ void epollfd::subscribe(int fd, int what, std::function<void()> const& cont, std
         {
             if (flags[fd] & what)
             {
-                throw std::runtime_error("already signed to this event");
+                throw std::runtime_error("already subscribed to this event");
             }
             flags[fd] |= what;
-            try {
-                mod_epoll(fd);
-            } catch (std::exception const&)
+            if (!mod_epoll(fd))
             {
                 flags[fd] ^= what;
-                throw;
+                throw std::runtime_error("could not modify epoll");
             }
             row.insert(make_pair(what, make_pair(cont, cont_err)));
         } else
         {
-            throw std::exception();
+            throw std::runtime_error("already subscribed to this event");
         }
         
     }
@@ -87,12 +97,12 @@ void epollfd::unsubscribe(int fd, int what)
 
     if (fd_row == data.end())
     {
-        throw std::exception();
+        throw std::runtime_error("No such file descripor in epoll");
     } else
     {
         if ((*fd_row).second.find(what) == (*fd_row).second.end())
         {
-            throw std::exception();
+            throw std::runtime_error("No such event for file descriptor");
         }
 
         (*fd_row).second.erase(what);
@@ -100,24 +110,20 @@ void epollfd::unsubscribe(int fd, int what)
         flags[fd] &= ~what;
         if ((*fd_row).second.empty())
         {
-            try {
-                del_from_epoll(fd);
-            } catch (std::exception const&)
+            if (!del_from_epoll(fd))
             {
                 flags[fd] |= what;
-                throw;
+                throw std::runtime_error("Could not delete from epoll");
             }
 
             data.erase(fd_row);
             flags.erase(fd);
         } else 
         {
-            try {
-                mod_epoll(fd);
-            } catch (std::exception const&)
+            if (!mod_epoll(fd))
             {
                 flags[fd] |= what;
-                throw;
+                throw std::runtime_error("could not modify epoll");
             }
         }
     }
@@ -131,44 +137,52 @@ void epollfd::cycle()
 
     if (count == -1)
     {
-        throw std::exception();
+        throw std::runtime_error("epoll_wait() error, code: " + std::to_string(errno));
     }
 
     for (int i = 0; i < count; i++)
     {
-        epoll_event& event = events[i];
+        auto& event = events[i];
         auto& row = data[event.data.fd];
         auto it = row.begin();
         while(it != row.end())
         {
-
+            std::cout << "starting handling events for " << event.data.fd << std::endl;
             auto ev = *it;
+
+            flags[event.data.fd] &= ~ev.first;
+            if (!mod_epoll(event.data.fd))
+            {
+                flags[event.data.fd] |= ev.first;
+                throw std::runtime_error("could not modify epoll");
+            }
 
             auto next = std::next(it);
             row.erase(it);
             it = next;
-            flags[event.data.fd] &= ~ev.first;
-            try {
-                mod_epoll(event.data.fd);
-            } catch(std::exception const&)
+
+            bool is_empty = row.empty();
+
+            if (is_empty)
             {
-                flags[event.data.fd] |= ev.first;
-                throw;
+                if (!del_from_epoll(event.data.fd))
+                {
+                    throw std::runtime_error("could not delete from epoll");
+                }
+                data.erase(event.data.fd);
+                flags.erase(event.data.fd);
             }
 
             if ((event.events & (EPOLLERR | EPOLLHUP))
-                && !(event.events & (EPOLLIN | EPOLLHUP)))
+                && !(event.events & (EPOLLIN | EPOLLHUP))) // We may be able to read something from hupped descriptor
             {
                 ev.second.second();
             } else if (ev.first & event.events)
             {
                 ev.second.first();
             }
-        }
-        if (row.empty())
-        {
-            del_from_epoll(event.data.fd);
-            data.erase(event.data.fd);
+
+            if (is_empty) break;
         }
     }
 }

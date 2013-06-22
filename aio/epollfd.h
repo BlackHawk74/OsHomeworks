@@ -20,15 +20,18 @@ public:
     ~epollfd();
 
 private:
-    void add_to_epoll(int fd, int what);
-    void del_from_epoll(int fd);
-    void mod_epoll(int fd);
+    bool add_to_epoll(int fd);
+    bool del_from_epoll(int fd);
+    bool mod_epoll(int fd);
 
     int efd;
 
     std::unordered_map<int, 
         std::unordered_map<int, 
-                            std::pair<std::function<void()>, std::function<void()>>
+            std::pair<
+                std::function<void()>, 
+                std::function<void()>
+            >
         >
     > data;
 
