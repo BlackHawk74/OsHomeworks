@@ -1,4 +1,5 @@
 #include "epollfd.h"
+#include <cstring>
 #include <iostream>
 #include <errno.h>
 
@@ -17,6 +18,7 @@ bool epollfd::add_to_epoll(int fd)
 {
     std::cout << "adding to epoll " << fd << std::endl;
     epoll_event event;
+    memset(&event, 0, sizeof(event));
     event.events = flags[fd];
     event.data.fd = fd;
 
@@ -41,6 +43,7 @@ bool epollfd::mod_epoll(int fd)
 {
     std::cout << "modifying epoll " << fd << std::endl;
     epoll_event event;
+    memset(&event, 0, sizeof(event));
     event.events = flags[fd];
     event.data.fd = fd;
 
@@ -54,6 +57,13 @@ bool epollfd::mod_epoll(int fd)
 
 void epollfd::subscribe(int fd, int what, std::function<void()> const& cont, std::function<void()> const& cont_err)
 {
+    std::cout << "subscribe" << std::endl;
+    for (auto x : data)
+    {
+        std::cout << x.first << std::endl;
+    }
+    std::cout << "------\n";
+
     auto fd_row = data.find(fd);
     if (fd_row == data.end())
     {
@@ -63,9 +73,10 @@ void epollfd::subscribe(int fd, int what, std::function<void()> const& cont, std
             flags.erase(fd);
             throw std::runtime_error("could not add to epoll");
         }
-        std::unordered_map<int, std::pair<std::function<void()>, std::function<void()>>> new_row;
-        new_row.insert(std::make_pair(what, std::make_pair(cont, cont_err)));
-        data.insert(std::make_pair(fd, new_row));
+        //std::unordered_map<int, std::pair<std::function<void()>, std::function<void()>>> new_row;
+        //new_row.insert(std::make_pair(what, std::make_pair(cont, cont_err)));
+        //data.insert(std::make_pair(fd, new_row));
+        data[fd].insert(std::make_pair(what, std::make_pair(cont, cont_err)));
     } else 
     {
         auto& row = (*fd_row).second;
@@ -74,7 +85,7 @@ void epollfd::subscribe(int fd, int what, std::function<void()> const& cont, std
         {
             if (flags[fd] & what)
             {
-                throw std::runtime_error("already subscribed to this event");
+                throw std::invalid_argument("already subscribed to this event");
             }
             flags[fd] |= what;
             if (!mod_epoll(fd))
@@ -87,12 +98,12 @@ void epollfd::subscribe(int fd, int what, std::function<void()> const& cont, std
         {
             throw std::runtime_error("already subscribed to this event");
         }
-        
     }
 }
 
 void epollfd::unsubscribe(int fd, int what)
 {
+    std::cout << "unsubscribe" << std::endl;
     auto fd_row = data.find(fd);
 
     if (fd_row == data.end())
@@ -131,6 +142,7 @@ void epollfd::unsubscribe(int fd, int what)
 
 void epollfd::cycle()
 {
+    std::cout << "cycle" << std::endl;
     epoll_event events[MAX_EVENTS];
 
     int count = epoll_wait(efd, events, MAX_EVENTS, -1);
@@ -143,9 +155,9 @@ void epollfd::cycle()
     for (int i = 0; i < count; i++)
     {
         auto& event = events[i];
-        auto& row = data[event.data.fd];
-        auto it = row.begin();
-        while(it != row.end())
+        auto row = data.find(event.data.fd);
+        auto it = row->second.begin();
+        while(it != row->second.end())
         {
             std::cout << "starting handling events for " << event.data.fd << std::endl;
             auto ev = *it;
@@ -158,10 +170,10 @@ void epollfd::cycle()
             }
 
             auto next = std::next(it);
-            row.erase(it);
+            row->second.erase(it);
             it = next;
 
-            bool is_empty = row.empty();
+            bool is_empty = row->second.empty();
 
             if (is_empty)
             {
@@ -169,7 +181,7 @@ void epollfd::cycle()
                 {
                     throw std::runtime_error("could not delete from epoll");
                 }
-                data.erase(event.data.fd);
+                data.erase(row);
                 flags.erase(event.data.fd);
             }
 
